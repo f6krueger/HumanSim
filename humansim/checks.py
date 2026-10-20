@@ -12,6 +12,7 @@ from .context import State
 from .registry import Registry
 
 BLOOD_DENSITY_KG_PER_L = 1.06  # approximate
+MAX_UNASSIGNED_FRACTION = 0.10  # above this, the tissue budget warns
 
 # Tissues whose masses are expected to add up to (most of) body mass.
 TISSUE_MASSES = (
@@ -51,6 +52,12 @@ def tissue_mass_budget(state: State) -> CheckResult:
         return CheckResult("tissue_mass_budget", "warn",
                            f"Partial budget: {len(missing)} tissue(s) have no value; "
                            f"{remainder:.2f} kg unassigned.", details)
+    if remainder / mass > MAX_UNASSIGNED_FRACTION:
+        return CheckResult("tissue_mass_budget", "warn",
+                           f"{remainder:.1f} kg ({remainder / mass:.0%}) of body mass is not covered by "
+                           f"the listed tissues. Most likely the organ and tissue masses (ICRP reference "
+                           f"man, 73 kg) and body mass ({mass:.1f} kg) come from different populations; "
+                           f"it does not mean anatomy is missing.", details)
     return CheckResult("tissue_mass_budget", "pass",
                        f"Listed tissues sum to {total:.2f} kg; {remainder:.2f} kg unassigned "
                        f"(gut contents, bone marrow detail, double-counted blood in organs, etc.).",

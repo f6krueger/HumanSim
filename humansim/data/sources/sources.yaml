@@ -9,7 +9,13 @@ sources:
     url: null
     evidence: A
     verified_via: "secondary pages only (PMC8646028, PMC6343858); original not read"
-    notes: "Height 176 cm, mass 73 kg, cardiac output 6.5 L/min, blood volume 5300 cm^3 and hepatic flow fraction were read from papers quoting it. Organ masses in composition.yaml are recalled, not read."
+    notes: "Cardiac output 6.5 L/min, blood volume 5300 cm^3 and hepatic flow fraction were read from papers quoting it. (Height 176 cm and mass 73 kg are the ICRP reference man, but the model now uses ANSUR II for height and mass.) Organ masses in composition.yaml are recalled, not read."
+  ansur2:
+    citation: "2012 Anthropometric Survey of U.S. Army Personnel (ANSUR II), public release: ANSUR_II_MALE_Public.csv (n=4082) and ANSUR_II_FEMALE_Public.csv (n=1986). U.S. Army Natick Soldier Research, Development and Engineering Center."
+    url: null
+    evidence: A
+    verified_via: "computed from the attached public CSV files by tools/build_ansur_data.py (survey dates in the file: 4-Oct-10 to 4-Apr-12; mean age 30.2 male, 28.9 female)"
+    notes: "US Army personnel (Regular Army, National Guard, Reserve), ages 17-58. A large measured sample, but a military population, so it is leaner, younger and less varied than the general public. Lengths are in mm and weight in tenths of kg in the raw files."
   pmc8646028:
     citation: "Table T2 (fixed model parameters) of PMC8646028, a physiological liver model paper. Article title not recorded. Quotes ICRP 2002, de Simone 1997, Vander 2001 and Herman 2016."
     url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC8646028/table/T2"

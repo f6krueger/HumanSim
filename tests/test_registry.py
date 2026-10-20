@@ -38,8 +38,10 @@ def test_user_parameter_list_is_present(registry):
 
 
 def test_reference_male_anchor_values(registry):
-    assert registry["height"].baseline("male", "adult") == 176.0
-    assert registry["body_mass"].baseline("male", "adult") == 73.0
+    # Height and mass come from ANSUR II (computed from the raw file); the cardiovascular
+    # values are the ICRP 89 reference male, read via secondary papers.
+    assert registry["height"].baseline("male", "adult") == pytest.approx(175.6, abs=0.3)
+    assert registry["body_mass"].baseline("male", "adult") == pytest.approx(85.5, abs=0.5)
     assert registry["cardiac_output"].baseline("male", "adult") == 6.5
     assert registry["blood_volume"].baseline("male", "adult") == 5.3
 

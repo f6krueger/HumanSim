@@ -23,7 +23,7 @@ STATUSES = ("referenced", "unsourced", "placeholder", "missing")
 
 _ID_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 _ALLOWED_KEYS = {
-    "id", "name", "unit", "kind", "values", "status", "source_ref", "note",
+    "id", "name", "unit", "kind", "values", "sd", "status", "source_ref", "note",
     "ref_range", "range_source_ref", "viability_limit",
 }
 
@@ -40,6 +40,7 @@ class Parameter:
     kind: str
     group: str
     values: Mapping[str, Mapping[object, float]] = field(default_factory=dict)
+    sd: Mapping[str, Mapping[object, float]] = field(default_factory=dict)
     status: str = "missing"
     source_ref: str | None = None
     note: str = ""
@@ -51,6 +52,10 @@ class Parameter:
     def baseline(self, sex: str, age: object) -> float | None:
         """Mean value for (sex, age), or None if the data has no entry for it."""
         return self.values.get(sex, {}).get(age)
+
+    def spread(self, sex: str, age: object) -> float | None:
+        """Standard deviation for (sex, age) if the data has one."""
+        return self.sd.get(sex, {}).get(age)
 
 
 class Registry:
@@ -156,6 +161,16 @@ def _build(raw: dict, group: str, filename: str) -> Parameter:
             raise RegistryError(f"{where}: sex must be male or female, got {sex!r}")
         values[sex] = {age: float(v) for age, v in by_age.items()}
 
+    sd: dict[str, dict[object, float]] = {}
+    for sex, by_age in (raw.get("sd") or {}).items():
+        sd[sex] = {}
+        for age, s in by_age.items():
+            if float(s) <= 0:
+                raise RegistryError(f"{where}: sd must be positive")
+            if age not in values.get(sex, {}):
+                raise RegistryError(f"{where}: sd given for ({sex}, {age}) but there is no value")
+            sd[sex][age] = float(s)
+
     status = raw.get("status", "missing" if not values else "unsourced")
     if status not in STATUSES:
         raise RegistryError(f"{where}: status must be one of {STATUSES}")
@@ -164,7 +179,7 @@ def _build(raw: dict, group: str, filename: str) -> Parameter:
 
     return Parameter(
         id=pid, name=raw["name"], unit=raw["unit"], kind=raw["kind"], group=group,
-        values=values, status=status, source_ref=raw.get("source_ref"),
+        values=values, sd=sd, status=status, source_ref=raw.get("source_ref"),
         note=raw.get("note", ""), ref_range=_range(raw.get("ref_range"), where),
         range_source_ref=raw.get("range_source_ref"),
         viability_limit=_range(raw.get("viability_limit"), where),
