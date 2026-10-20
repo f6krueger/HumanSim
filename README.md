@@ -4,9 +4,9 @@ A Python library that models the human body as a network of interconnected anato
 physiological parameters, for population averages (not individuals). You set a context, edit any
 value, and see what changes. See `docs/SPEC.md` for the full design.
 
-**Status: Phase 6.** The core, derived layer, consistency checks, modifier machinery, adult male and
+**Status: Phase 7.** The core, derived layer, consistency checks, modifier machinery, adult male and
 female baselines (both stored, either derivable from the other), a steady-state solver and an age
-axis for birth to 20 years, sex hormones (levels, one dose-response effect, two dynamic models) exist. A first pharmacokinetics layer exists. Genetics is specified but not built yet. Run `python -m humansim coverage` to see exactly how much data there is.
+axis for birth to 20 years, sex hormones (levels, one dose-response effect, two dynamic models) exist. A first pharmacokinetics layer and a one-gene pharmacogenetics layer exist. The UI is not built yet. Run `python -m humansim coverage` to see exactly how much data there is.
 
 ## Install and run
 
@@ -234,6 +234,31 @@ gentamicin and caffeine pages I could reach had none), metabolites, protein bind
 the body, and between-person variability. Per-kg label values are applied to both sexes because the labels
 do not give volunteer sex or mass.
 
+## Genetics (Phase 7)
+
+`python -m humansim genes` lists genes, activity scores and population frequencies.
+`python -m humansim pk --drug ibuprofen --dose 800 --infusion 1 --genotype CYP2C9='*1/*3'`
+
+`genetics.py` implements the CPIC activity-score scheme: each allele has an activity value, a
+diplotype's score is the sum, and the score gives a phenotype (normal, intermediate, poor). Set a
+genotype with `Context(genotype={"CYP2C9": "*1/*3"})`. Allele frequencies give Hardy-Weinberg diplotype
+and phenotype frequencies (`genes` command). A drug can list a `genotype_effects` entry: a table of
+mean AUC ratios by activity score, and the model divides clearance by the ratio. The reference person is
+treated as a normal metabolizer (*1/*1).
+
+Built: CYP2C9 (*1, *2, *3; CPIC 2020 activity values) and **IV ibuprofen** (AUC x1.43 for *1/*3, from CPIC's
+meta-analysis; the label's 800 mg AUC of 192.8 is reproduced for *1/*1).
+
+**Limits.** One gene, one drug with genotype data. Only activity scores 2 and 1 have ibuprofen data:
+1.5 is interpolated and flagged, and poor metabolizers (score below 1) are **refused**, not guessed. The
+ratios come from oral studies, so applying them to IV dosing assumes bioavailability does not depend on
+genotype. Allele frequencies exist for people of European ancestry only (about 11% *2 and 7% *3 from the
+warfarin label); other alleles are counted as *1. CPIC and the label pages were read through a
+fetch tool's summary, not page by page; verify the numbers against the originals before relying on
+them. Ibuprofen clearance and volume are *derived* from the label's AUC and rate constant, with an assumed
+73 kg volunteer. Genotype changes no anatomical or physiological parameter: no sourced numbers for that are
+in the project yet. CYP3A5 was examined for midazolam and left out because the sources found show no effect.
+
 ## Layout
 
 ```
@@ -251,6 +276,8 @@ humansim/
   hpg.py             male HPG feedback model (assumed structure)
   cycle.py           menstrual-cycle hormone profile
   pharmacology.py    one-compartment IV pharmacokinetics
+  genetics.py        pharmacogene alleles, activity scores, frequencies
+  data/genetics/     gene records (genes.yaml)
   data/drugs/        drug records (seed.yaml)
   data/couplings/    the Phase 3 couplings (steady_state.yaml)
   growth.py          CDC growth-curve (LMS) lookup for the age axis

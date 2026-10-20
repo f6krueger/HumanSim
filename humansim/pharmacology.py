@@ -45,6 +45,7 @@ class Drug:
     clearance_scaling: Mapping[str, float]
     volume_scaling: Mapping[str, float]
     scaling_note: str = ""
+    genotype_effects: tuple = ()  # ({gene, auc_ratio_by_activity_score, source_ref, note}, ...)
 
     def __post_init__(self) -> None:
         if self.clearance_l_h_kg <= 0 or self.volume_l_kg <= 0:
@@ -67,7 +68,8 @@ def load_drugs(data_dir: str | Path | None = None) -> dict[str, Drug]:
                      clearance_l_h_kg=float(raw["clearance_l_h_kg"]), volume_l_kg=float(raw["volume_l_kg"]),
                      label_half_life_h=raw.get("label_half_life_h"), status=raw.get("status", "unsourced"),
                      source_ref=raw.get("source_ref"), clearance_scaling=dict(raw.get("clearance_scaling") or {}),
-                     volume_scaling=dict(raw.get("volume_scaling") or {}), scaling_note=raw.get("scaling_note", ""))
+                     volume_scaling=dict(raw.get("volume_scaling") or {}), scaling_note=raw.get("scaling_note", ""),
+                     genotype_effects=tuple(raw.get("genotype_effects") or ()))
             if d.id in out:
                 raise RegistryError(f"Duplicate drug id {d.id!r}")
             out[d.id] = d
@@ -119,6 +121,30 @@ def _scale(state: State, ref: State, scaling: Mapping[str, float]) -> float:
     return f
 
 
+def genotype_clearance_factor(drug: Drug, genotype: Mapping[str, str], genes=None) -> tuple[float, list[str], set[str]]:
+    """(factor on clearance, notes, flags) from the person's genotype. 1.0 for the reference (*1/*1).
+    A gene the person has a genotype for but the drug has no data on changes nothing and is noted."""
+    from .genetics import exposure_ratio, load_genes
+
+    genes = genes or load_genes()
+    factor, notes, flags = 1.0, [], set()
+    for gid, dip in genotype.items():
+        if gid not in genes:
+            raise KeyError(f"Unknown gene {gid!r}; known: {', '.join(genes)}")
+        score = genes[gid].activity_score(dip)
+        effects = [e for e in drug.genotype_effects if e["gene"] == gid]
+        if not effects:
+            notes.append(f"{gid} {dip}: no data on {drug.id}, so no effect applied")
+            continue
+        for e in effects:
+            ratio, interpolated = exposure_ratio(e["auc_ratio_by_activity_score"], score)
+            factor /= ratio
+            flags |= {"genotype_effect"} | ({"interpolated"} if interpolated else set())
+            notes.append(f"{gid} {dip} (activity score {score:g}, {genes[gid].phenotype(dip)}): "
+                         f"AUC x{ratio:.3g}, clearance /{ratio:.3g}" + (" (interpolated)" if interpolated else ""))
+    return factor, notes, flags
+
+
 def pk_parameters(registry: Registry, state: State, drug: Drug, modifiers=()) -> tuple[float, float, float]:
     """(clearance L/h, volume L, reference mass kg) for this state."""
     ctx = state.context
@@ -128,6 +154,7 @@ def pk_parameters(registry: Registry, state: State, drug: Drug, modifiers=()) ->
     if ref_mass is None:
         raise ValueError("no body mass for this context")
     cl = drug.clearance_l_h_kg * ref_mass * _scale(state, ref, drug.clearance_scaling)
+    cl *= genotype_clearance_factor(drug, ctx.genotype)[0]
     v = drug.volume_l_kg * ref_mass * _scale(state, ref, drug.volume_scaling)
     return cl, v, ref_mass
 
@@ -166,6 +193,9 @@ def simulate(registry: Registry, state: State, drug: Drug, doses: list[Dose], ho
     if any(f in state.flags.get(p, set()) for p in drug.clearance_scaling for f in ("edited", "modified", "solved")):
         res.flags.add("scaled_from_changed_body")
     res.notes.append(drug.scaling_note)
+    _, gnotes, gflags = genotype_clearance_factor(drug, state.context.genotype)
+    res.notes.extend(gnotes)
+    res.flags |= gflags
     return res
 
 

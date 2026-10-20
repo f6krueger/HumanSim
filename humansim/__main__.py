@@ -8,6 +8,7 @@ import sys
 from .checks import drug_checks, coupling_checks, growth_continuity, dataset_checks, modifier_checks, state_checks
 from .context import Context, resolve
 from .couplings import load_couplings
+from .genetics import load_genes, validate_genotype
 from .pharmacology import Dose, load_drugs, simulate as pk_simulate
 from .growth import load_growth
 from .modifiers import load_modifiers
@@ -45,7 +46,17 @@ def _context(args, reg: Registry) -> Context:
         if pid not in reg or reg[pid].group != "hormones" or not text:
             raise SystemExit(f"--hormone needs ID=VALUE for a hormone parameter, got {item!r}")
         hormones[pid] = parse_value(text, reg[pid].unit)
-    kwargs = dict(sex=args.sex, age=age, growth_z=getattr(args, "z", 0.0), edits=_parse_edits(reg, args.set),
+    genotype = {}
+    for item in getattr(args, "genotype", None) or []:
+        gid, _, dip = item.partition("=")
+        if not dip:
+            raise SystemExit(f"--genotype needs GENE=DIPLOTYPE like CYP2C9='*1/*3', got {item!r}")
+        genotype[gid] = dip
+    try:
+        validate_genotype(load_genes(), genotype)
+    except (KeyError, ValueError) as exc:
+        raise SystemExit(f"error: {exc.args[0] if exc.args else exc}") from None
+    kwargs = dict(sex=args.sex, genotype=genotype, age=age, growth_z=getattr(args, "z", 0.0), edits=_parse_edits(reg, args.set),
                   keep_unadjusted=getattr(args, "keep_unadjusted", False), hormone_state=hormones,
                   cycle_phase=getattr(args, "cycle_phase", None))
     day = getattr(args, "cycle_day", None)
@@ -80,6 +91,8 @@ def main(argv: list[str] | None = None) -> int:
                        help="override a parameter, e.g. body_mass=90 or body_mass='198 lb'")
         p.add_argument("--hormone", action="append", metavar="ID=VALUE",
                        help="set a hormone level, e.g. testosterone_total=1345 (ng/dL); drives hormone effects")
+        p.add_argument("--genotype", action="append", metavar="GENE=DIPLOTYPE",
+                       help="e.g. CYP2C9='*1/*3'; changes drug clearance where the drug has data")
         p.add_argument("--cycle-phase", choices=["follicular", "midcycle", "luteal", "postmenopausal"],
                        help="adult women: use this phase's reference hormone values")
         p.add_argument("--cycle-day", type=float, help="adult women: cycle day 1-28 (interpolated profile)")
@@ -108,6 +121,9 @@ def main(argv: list[str] | None = None) -> int:
     p_pk.add_argument("--infusion", type=float, default=0.0, help="infusion time in hours (0 = bolus)")
     p_pk.add_argument("--hours", type=float, default=24.0)
 
+    p_genes = sub.add_parser("genes", help="pharmacogenes, activity scores and population frequencies")
+    p_genes.add_argument("--population", default="european")
+
     sub.add_parser("compare", help="male and female side by side")
     sub.add_parser("validate", help="sex rules vs stored pairs, and ANSUR II ratios vs an independent dataset")
 
@@ -119,6 +135,18 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     modifiers = load_modifiers()
+    if args.cmd == "genes":
+        for g in load_genes().values():
+            print(f"{g.id}: {g.name} (activity scores from {g.activity_source_ref})")
+            try:
+                dips = g.diplotype_frequencies(args.population)
+            except KeyError as exc:
+                print(f"  {exc.args[0]}")
+                continue
+            for dip, f in sorted(dips.items(), key=lambda kv: -kv[1]):
+                print(f"  {dip:<8} score {g.activity_score(dip):<4g} {g.phenotype(dip):<13} {f:6.2%}")
+            print("  by phenotype: " + ", ".join(f"{k} {v:.1%}" for k, v in g.phenotype_frequencies(args.population).items()))
+        return 0
     if args.cmd == "compare":
         print(format_compare(resolve(reg, Context(sex="male"), modifiers),
                              resolve(reg, Context(sex="female"), modifiers)))
@@ -148,7 +176,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"clearance {r.clearance_l_h:.1f} L/h, volume {r.volume_l:.1f} L, half-life {r.half_life_h:.2f} h")
         print(f"Cmax {r.cmax_mg_l:.2f} mg/L, AUC over {args.hours:g} h {r.auc_mg_h_l():.1f} mg*h/L")
         print(f"flags: {', '.join(sorted(r.flags))}")
-        print(f"note: {r.notes[0]}")
+        for note in r.notes:
+            print(f"note: {note}")
         return 0
 
     if args.cmd == "show":
@@ -174,7 +203,9 @@ def main(argv: list[str] | None = None) -> int:
     cited = ({m.source_ref for m in modifiers} | {c.source_ref for c in couplings}
              | {load_validation("nchs_sex_ratios")["source_ref"], "mifflin1990"}
              | {c['source_ref'] for c in load_growth()._curves.values()}
-             | {d.source_ref for d in load_drugs().values()}) - {None}
+             | {d.source_ref for d in load_drugs().values()}
+             | {e['source_ref'] for d in load_drugs().values() for e in d.genotype_effects}
+             | {x for g in load_genes().values() for x in [g.activity_source_ref] + [p['source_ref'] for p in g.populations.values()]}) - {None}
     results = (state_checks(state) + dataset_checks(reg, sources, cited)
                + modifier_checks(reg, modifiers, sources)
                + coupling_checks(reg, couplings, sources)

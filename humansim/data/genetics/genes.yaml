@@ -1,0 +1,18 @@
+# Pharmacogenes. Alleles carry an activity value; a diplotype's activity score is the sum of its two alleles.
+genes:
+  - id: CYP2C9
+    name: Cytochrome P450 2C9
+    alleles:
+      "*1": {activity: 1.0, function: normal}
+      "*2": {activity: 0.5, function: decreased}
+      "*3": {activity: 0.0, function: none}
+    activity_source_ref: cpic_nsaid_2020
+    # phenotype by activity score (CPIC): 2 normal; 1.5 and 1 intermediate; 0.5 and 0 poor
+    phenotypes: {"2": normal, "1.5": intermediate, "1": intermediate, "0.5": poor, "0": poor}
+    # Allele frequencies by ancestry. Only the *2 and *3 frequencies in people of European ancestry are
+    # sourced; *1 is the remainder, so other alleles in that group are counted as *1.
+    populations:
+      european:
+        frequencies: {"*2": 0.11, "*3": 0.07}
+        source_ref: warfarin_label_cyp2c9
+        note: "Approximate ('approximately 11% and 7%'). Other reduced-function alleles are not listed and are counted as *1."

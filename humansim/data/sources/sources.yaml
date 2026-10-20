@@ -100,3 +100,21 @@ sources:
     evidence: B
     verified_via: "page text retrieved via WebFetch: clearance 0.25-0.54 L/h/kg and volume of distribution 1.0-3.1 L/kg from six single-dose studies in healthy adults; half-life 1.8-6.4 h (mean about 3 h); CYP3A4 in liver and gut wall; <0.5% unchanged in urine."
     notes: "The label gives ranges across studies, not a mean; the model uses range midpoints, which are not means. No oral bioavailability or extraction ratio is stated, so only intravenous dosing is modelled."
+  cpic_nsaid_2020:
+    citation: "CPIC guideline for CYP2C9 and nonsteroidal anti-inflammatory drugs (Clinical Pharmacogenetics Implementation Consortium, 2020), Table 1 (allele function, activity scores, phenotypes) and the meta-analysis of drug exposure by diplotype."
+    url: "https://files.cpicpgx.org/data/guideline/publication/NSAID/2020/32189324.pdf"
+    evidence: A
+    verified_via: "guideline PDF retrieved via WebFetch (summarised by the fetch tool, not read page by page): *1 activity 1.0; *2 0.5; *3 0 (moved to no function in this guideline); AS 2 NM, 1.5 and 1 IM, 0.5 and 0 PM; mean AUC ratios versus *1/*1: celecoxib 1.62 (*1/*3) and 4.17 (*3/*3), ibuprofen 1.43 (*1/*3), meloxicam 1.82 (*1/*3)."
+    notes: "Exposure ratios come from oral studies, so they are ratios of oral AUC (apparent clearance), and applying them to intravenous dosing assumes bioavailability does not change with genotype. The guideline gives no allele frequencies in the text I could read."
+  warfarin_label_cyp2c9:
+    citation: "Warfarin sodium tablets, prescribing information, sections 12.3 and 12.5 (CYP2C9 pharmacogenomics), as reproduced on medlibrary.org."
+    url: "https://medlibrary.org/lib/rx/meds/warfarin-sodium/page/6/"
+    evidence: B
+    verified_via: "page text retrieved via WebFetch: 'The frequencies of these alleles in Caucasians are approximately 11% and 7% for CYP2C9*2 and CYP2C9*3, respectively.'"
+    notes: "Gives allele frequencies for people of European ancestry only. No other ancestry group is available, so population-average genotype frequencies exist only for that group."
+  fda_ibuprofen_iv_2021:
+    citation: "Caldolor (ibuprofen) injection, prescribing information, Cumberland Pharmaceuticals (FDA label 022348s018, 2021), section 12.3 Table 4."
+    url: "https://www.accessdata.fda.gov/drugsatfda_docs/label/2021/022348s018lbl.pdf"
+    evidence: B
+    verified_via: "label retrieved via WebFetch: 800 mg over 60 min in 12 adults, AUC 192.8 mcg*h/mL, KEL 0.29 1/h, T1/2 2.44 h; >99% protein bound. The label gives no adult clearance or volume of distribution; the model derives clearance = dose / AUC and volume = clearance / KEL."
+    notes: "Derived, not quoted: clearance 4.15 L/h and volume 14.3 L assume the reported AUC is AUC to infinity. Volunteer body mass is not given; the values are applied to the 73 kg / 60 kg reference person as a per-kg figure (4.15/73), which is an assumption. Binding is saturable, so values at 400 mg differ (3.7 L/h)."

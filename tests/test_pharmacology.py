@@ -20,7 +20,7 @@ def env(reg):
 
 def test_drug_data_loads_with_sources(env):
     mods, cps, drugs = env
-    assert set(drugs) == {"acetaminophen", "midazolam"}
+    assert set(drugs) == {"acetaminophen", "midazolam", "ibuprofen"}
     assert set(d.source_ref for d in drugs.values()) <= set(load_sources())
     assert all(r.status != "fail" for r in drug_checks(Registry.load(), drugs, load_sources(), mods))
 

@@ -24,3 +24,20 @@ drugs:
     clearance_scaling: {hepatic_blood_flow: 0.5, liver_mass: 0.5}
     volume_scaling: {body_mass: 1.0}
     scaling_note: "Assumed: CYP3A4 clearance sits between flow-limited and capacity-limited, so it is split evenly between hepatic blood flow and liver mass. Values are midpoints of ranges across six studies (0.25-0.54 L/h/kg; 1.0-3.1 L/kg), not means."
+  - id: ibuprofen
+    name: Ibuprofen, intravenous (800 mg over 60 min)
+    routes: [iv]
+    clearance_l_h_kg: 0.0568   # 4.15 L/h (= 800 mg / 192.8 mg*h/L) over an assumed 73 kg
+    volume_l_kg: 0.196         # 14.3 L (= 4.15 L/h / 0.29 1/h) over an assumed 73 kg
+    label_half_life_h: 2.44
+    status: referenced
+    source_ref: fda_ibuprofen_iv_2021
+    clearance_scaling: {liver_mass: 1.0}
+    volume_scaling: {body_mass: 1.0}
+    scaling_note: "Derived from the label's AUC and elimination rate constant, not quoted (the label gives no adult clearance or volume); volunteer mass is not stated, so 73 kg is assumed. Assumed: clearance follows liver mass, volume follows body mass. Highly and saturably protein bound, which a one-compartment model ignores."
+    genotype_effects:
+      - gene: CYP2C9
+        # mean AUC ratio versus *1/*1, by activity score; clearance falls by the same factor
+        auc_ratio_by_activity_score: {"2": 1.0, "1": 1.43}
+        source_ref: cpic_nsaid_2020
+        note: "Only activity scores 2 and 1 have data (*1/*3 gave 1.43). 1.5 is interpolated and flagged; scores below 1 have no ibuprofen data and are refused."
