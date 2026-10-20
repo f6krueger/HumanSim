@@ -41,6 +41,50 @@ def _fmt(v: float | None) -> str:
     return "-" if v is None else f"{v:.4g}"
 
 
+def format_compare(male: State, female: State) -> str:
+    rows = []
+    for p in male.registry:
+        m, f = male.get(p.id), female.get(p.id)
+        if m is None and f is None:
+            continue
+        ratio = "-" if (m is None or f is None or m == 0) else f"{f / m:.3f}"
+        notes = ",".join(sorted(female.flags.get(p.id, set()) & {"no_sex_rule", "unsourced", "missing"}))
+        rows.append((p.id, _fmt(m), _fmt(f), ratio, p.unit, notes))
+    w = [max(len(r[i]) for r in rows) for i in range(5)]
+    head = f"{'parameter':<{w[0]}}  {'male':>{w[1]}}  {'female':>{w[2]}}  {'F/M':>{w[3]}}  {'unit':<{w[4]}}"
+    return head + "\n" + "\n".join(
+        f"{a:<{w[0]}}  {b:>{w[1]}}  {c:>{w[2]}}  {d:>{w[3]}}  {e:<{w[4]}}  {n}" for a, b, c, d, e, n in rows)
+
+
+def format_validation(registry: Registry, modifiers, doc: dict) -> tuple[str, float]:
+    """Compare the derived female with the ANSUR II female means. Returns (text, worst % difference)."""
+    from .context import Context, resolve
+    from .validation import scaling_analysis
+
+    female = resolve(registry, Context(sex="female"), modifiers)
+    analysis = {r["id"]: r for r in scaling_analysis(doc, registry)}
+    lines = [
+        "Calibration check: derived female vs ANSUR II female means.",
+        "The rules were fitted to these means, so agreement is expected. This is a consistency",
+        "check, NOT independent validation.",
+        "",
+        f"{'parameter':<26}{'derived':>10}{'ANSUR II':>10}{'diff':>8}  rule type",
+    ]
+    worst = 0.0
+    for pid, rec in doc["parameters"].items():
+        d = female.get(pid)
+        if d is None:
+            lines.append(f"{pid:<26}{'-':>10}{rec['mean']:>10.2f}{'':>8}  NO DERIVED VALUE")
+            worst = float("inf")
+            continue
+        diff = d / rec["mean"] - 1.0
+        worst = max(worst, abs(diff))
+        lines.append(f"{pid:<26}{d:>10.2f}{rec['mean']:>10.2f}{diff:>+8.2%}  {analysis[pid]['type']}")
+    lines.append("")
+    lines.append(f"Largest difference: {worst:.3%}")
+    return "\n".join(lines), worst
+
+
 def format_state(state: State, group: str | None = None, only_changed: bool = False,
                  hide_missing: bool = True) -> str:
     reg = state.registry

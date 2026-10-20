@@ -43,7 +43,9 @@ def test_male_values_are_in_plausible_ranges(registry):
     h = registry["height"]
     assert 170 < h.baseline("male", "adult") < 182
     assert 4 < h.spread("male", "adult") < 9
-    lo, hi = h.ref_range
+    lo, hi = h.ref_range["male"]
+    flo, fhi = h.ref_range["female"]
+    assert fhi < hi and flo < lo  # women are shorter
     assert lo < h.baseline("male", "adult") < hi
     assert h.status == "referenced" and h.source_ref == "ansur2"
 

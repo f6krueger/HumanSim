@@ -17,6 +17,10 @@ from .registry import DATA_DIR, RegistryError
 
 STAGES = ("sex", "hormone", "genotype", "drug")
 OPS = ("ratio", "offset", "set")
+# anatomical: a shape difference beyond what body size explains; scaling: explained by body size
+# alone; physiological: a measured sex difference with no cause attributed; hormonal: reserved for
+# the hormone module; assumed_neutral: assumed to have no sex difference (not sourced).
+RULE_TYPES = ("anatomical", "scaling", "physiological", "hormonal", "assumed_neutral")
 
 
 @dataclass(frozen=True)
@@ -29,8 +33,11 @@ class Modifier:
     status: str = "unsourced"
     source_ref: str | None = None
     note: str = ""
+    rule_type: str = ""
 
     def __post_init__(self) -> None:
+        if self.rule_type and self.rule_type not in RULE_TYPES:
+            raise RegistryError(f"Modifier {self.id!r}: rule_type must be one of {RULE_TYPES}")
         if self.stage not in STAGES:
             raise RegistryError(f"Modifier {self.id!r}: stage must be one of {STAGES}")
         if self.op not in OPS:

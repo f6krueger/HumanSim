@@ -159,6 +159,7 @@ def main() -> None:
             extra = f", note: {q(note)}" if note else ""
             lines.append(f"  - {{id: {pid}, name: {q(name)}, unit: {unit if '/' not in unit else q(unit)}, kind: anchor{extra}}}")
             continue
+        f = stats_for(female_rows, spec)
         n_txt = f"n={m['n']}"
         full_note = (note + " " if note else "") + f"ANSUR II male, {n_txt}."
         ukey = unit if "/" not in unit else q(unit)
@@ -166,8 +167,8 @@ def main() -> None:
             f"  - {{id: {pid}, name: {q(name)}, unit: {ukey}, kind: anchor, "
             f"values: {{male: {{adult: {m['mean']:.2f}}}}}, sd: {{male: {{adult: {m['sd']:.2f}}}}}, "
             f"status: referenced, source_ref: ansur2, "
-            f"ref_range: [{m['p2_5']:.2f}, {m['p97_5']:.2f}], range_source_ref: ansur2, note: {q(full_note)}}}")
-        f = stats_for(female_rows, spec)
+            f"ref_range: {{male: [{m['p2_5']:.2f}, {m['p97_5']:.2f}], female: [{f['p2_5']:.2f}, {f['p97_5']:.2f}]}}, "
+            f"range_source_ref: ansur2, note: {q(full_note)}}}")
         female_out.append((pid, unit, f, m))
 
     OUT_VALUES.parent.mkdir(parents=True, exist_ok=True)

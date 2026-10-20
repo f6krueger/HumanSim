@@ -31,6 +31,9 @@ class Context:
     genotype: dict[str, str] = field(default_factory=dict)
     drugs: dict[str, float] = field(default_factory=dict)
     edits: dict[str, float] = field(default_factory=dict)  # parameter id -> value in registry unit
+    # Female only: keep male values that have no sex rule (flagged "no_sex_rule") instead of
+    # leaving them empty. Off by default because those values are not valid for a female body.
+    keep_unadjusted: bool = False
 
 
 @dataclass(frozen=True)
@@ -76,8 +79,14 @@ def resolve(registry: Registry, context: Context, modifiers: Iterable[Modifier] 
         if p.kind == "derived":
             continue
         v = p.baseline(context.sex, context.age)
-        values[p.id] = v
         f: set[str] = set()
+        if v is None and context.sex == "female":
+            # The female body is derived: start from the male baseline, then apply sex rules.
+            male = p.baseline("male", context.age)
+            if male is not None:
+                v = male
+                f |= {"derived_from_male", "no_sex_rule"}
+        values[p.id] = v
         if v is None:
             f.add("missing")
             if p.values:
@@ -95,6 +104,12 @@ def resolve(registry: Registry, context: Context, modifiers: Iterable[Modifier] 
             if pid not in values:
                 raise KeyError(f"Modifier {m.id!r} targets unknown or derived parameter {pid!r}")
             before = values[pid]
+            if (m.stage == "sex" and context.sex == "female"
+                    and "derived_from_male" not in flags[pid] and before is not None):
+                # A stored female value already is the female value; a rule would apply twice.
+                trace.append(TraceEntry(pid, m.stage, m.id, before, before,
+                                        "skipped: a stored female value exists"))
+                continue
             if before is None and m.op != "set":
                 flags[pid].add("modifier_skipped_no_baseline")
                 trace.append(TraceEntry(pid, m.stage, m.id, None, None, "skipped: no baseline value"))
@@ -103,10 +118,18 @@ def resolve(registry: Registry, context: Context, modifiers: Iterable[Modifier] 
             values[pid] = after
             flags[pid].discard("missing")
             flags[pid].discard("no_data_for_context")
+            if m.stage == "sex":
+                flags[pid].discard("no_sex_rule")
             flags[pid].add("modified")
             if m.status != "referenced":
                 flags[pid].add(f"modifier_{m.status}")
             trace.append(TraceEntry(pid, m.stage, m.id, before, after, m.note))
+
+    if context.sex == "female" and not context.keep_unadjusted:
+        for pid, f in flags.items():
+            if "no_sex_rule" in f and values.get(pid) is not None:
+                values[pid] = None  # a male value would be wrong for a female body
+                flags[pid] = {"missing", "no_sex_rule"}
 
     for pid, x in context.edits.items():
         if pid not in registry:
@@ -125,7 +148,8 @@ def resolve(registry: Registry, context: Context, modifiers: Iterable[Modifier] 
         v = values.get(p.id)
         if p.kind == "derived" or v is None:
             continue
-        if p.ref_range and not (p.ref_range[0] <= v <= p.ref_range[1]):
+        rng = p.ref_range.get(context.sex)  # ranges are per sex; no range for a sex means no flag
+        if rng and not (rng[0] <= v <= rng[1]):
             flags[p.id].add("outside_reference_range")
         if p.viability_limit and not (p.viability_limit[0] <= v <= p.viability_limit[1]):
             flags[p.id].add("beyond_viability_limit")

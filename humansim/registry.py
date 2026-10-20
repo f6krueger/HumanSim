@@ -44,7 +44,7 @@ class Parameter:
     status: str = "missing"
     source_ref: str | None = None
     note: str = ""
-    ref_range: tuple[float, float] | None = None
+    ref_range: Mapping[str, tuple[float, float]] = field(default_factory=dict)  # by sex
     range_source_ref: str | None = None
     viability_limit: tuple[float, float] | None = None
     formula: str | None = None
@@ -137,6 +137,20 @@ def _range(raw: object, where: str) -> tuple[float, float] | None:
     return (lo, hi)
 
 
+def _sex_ranges(raw: object, where: str) -> dict[str, tuple[float, float]]:
+    """ref_range is given per sex: {male: [lo, hi], female: [lo, hi]}."""
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise RegistryError(f"{where}: ref_range must be a mapping like {{male: [lo, hi]}}")
+    out = {}
+    for sex, rng in raw.items():
+        if sex not in ("male", "female"):
+            raise RegistryError(f"{where}: ref_range sex must be male or female, got {sex!r}")
+        out[sex] = _range(rng, where)
+    return out
+
+
 def _build(raw: dict, group: str, filename: str) -> Parameter:
     pid = raw.get("id", "?")
     where = f"{filename}:{pid}"
@@ -180,7 +194,7 @@ def _build(raw: dict, group: str, filename: str) -> Parameter:
     return Parameter(
         id=pid, name=raw["name"], unit=raw["unit"], kind=raw["kind"], group=group,
         values=values, sd=sd, status=status, source_ref=raw.get("source_ref"),
-        note=raw.get("note", ""), ref_range=_range(raw.get("ref_range"), where),
+        note=raw.get("note", ""), ref_range=_sex_ranges(raw.get("ref_range"), where),
         range_source_ref=raw.get("range_source_ref"),
         viability_limit=_range(raw.get("viability_limit"), where),
     )

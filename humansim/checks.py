@@ -96,8 +96,46 @@ def range_flags(state: State) -> CheckResult:
     return CheckResult("range_flags", "pass", "All stored values with a known range are inside it.")
 
 
+def female_rule_coverage(state: State) -> CheckResult:
+    if state.context.sex != "female":
+        return CheckResult("female_rule_coverage", "skipped", "not a female context")
+    no_rule = sorted(i for i, f in state.flags.items() if "no_sex_rule" in f)
+    if no_rule:
+        shown = ", ".join(no_rule[:8]) + (f", and {len(no_rule) - 8} more" if len(no_rule) > 8 else "")
+        return CheckResult(
+            "female_rule_coverage", "warn",
+            f"{len(no_rule)} parameter(s) have a male value but no sex rule, so they are "
+            f"empty (or flagged, with keep_unadjusted): {shown}", {"no_sex_rule": no_rule})
+    return CheckResult("female_rule_coverage", "pass", "Every parameter with a male value has a sex rule.")
+
+
 def state_checks(state: State) -> list[CheckResult]:
-    return [tissue_mass_budget(state), segment_stature_sum(state), range_flags(state)]
+    return [tissue_mass_budget(state), segment_stature_sum(state), range_flags(state),
+            female_rule_coverage(state)]
+
+
+def modifier_checks(registry: Registry, modifiers, sources: dict[str, dict] | None = None) -> list[CheckResult]:
+    """Data checks for modifiers: valid targets, known sources, and no duplicate sex rules."""
+    problems: list[str] = []
+    seen: dict[tuple, list[str]] = {}
+    for m in modifiers:
+        for pid in m.effects:
+            if pid not in registry:
+                problems.append(f"{m.id}: unknown parameter {pid!r}")
+            elif registry[pid].kind == "derived":
+                problems.append(f"{m.id}: targets derived parameter {pid!r}")
+            if m.stage == "sex":
+                seen.setdefault((pid, tuple(sorted(m.when.items()))), []).append(m.id)
+        if m.source_ref and sources is not None and m.source_ref not in sources:
+            problems.append(f"{m.id}: unknown source {m.source_ref!r}")
+        if m.status == "referenced" and not m.source_ref:
+            problems.append(f"{m.id}: status referenced but no source_ref")
+    dups = {k: v for k, v in seen.items() if len(v) > 1}
+    for (pid, _), ids in dups.items():
+        problems.append(f"duplicate sex rules for {pid!r}: {', '.join(ids)} (would apply twice)")
+    return [CheckResult("modifier_data", "fail" if problems else "pass",
+                        "; ".join(problems) if problems else f"{len(list(modifiers))} modifiers are consistent.",
+                        {"problems": problems})]
 
 
 def dataset_checks(registry: Registry, sources: dict[str, dict]) -> list[CheckResult]:
