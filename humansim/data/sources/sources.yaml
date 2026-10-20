@@ -1,0 +1,44 @@
+# Citation sidecar. The model runs without this file; it feeds reports and integrity checks.
+# evidence: A large reference compilation, B established formula or single large study,
+#           C secondary compilation or single-site data, D estimate.
+# verified_via says how I checked it in this session: retrieved (page read), title_and_equation
+# retrieved, or recalled (not retrieved).
+sources:
+  icrp89:
+    citation: "ICRP, 2002. Basic Anatomical and Physiological Data for Use in Radiological Protection: Reference Values. ICRP Publication 89. Annals of the ICRP 32(3-4)."
+    url: null
+    evidence: A
+    verified_via: "secondary pages only (PMC8646028, PMC6343858); original not read"
+    notes: "Height 176 cm, mass 73 kg, cardiac output 6.5 L/min, blood volume 5300 cm^3 and hepatic flow fraction were read from papers quoting it. Organ masses in composition.yaml are recalled, not read."
+  pmc8646028:
+    citation: "Table T2 (fixed model parameters) of PMC8646028, a physiological liver model paper. Article title not recorded. Quotes ICRP 2002, de Simone 1997, Vander 2001 and Herman 2016."
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC8646028/table/T2"
+    primary: icrp89
+    evidence: C
+    verified_via: retrieved
+    notes: "Secondary compilation. Gives male haematocrit 0.45, height, mass and cardiac output."
+  pmc6343858:
+    citation: "PMC6343858. Article title not recorded. Quotes ICRP 89 section 7.4 (total blood volume) and section 7.7.2 (regional blood volumes)."
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC6343858/"
+    primary: icrp89
+    evidence: C
+    verified_via: retrieved
+    notes: "Gives the ICRP 89 total blood volume of 5300 cm^3 (male) and regional blood volume fractions."
+  glos_haem:
+    citation: "Gloucestershire Hospitals NHS Foundation Trust, Haematology reference ranges (adult male: haemoglobin 130-180 g/L, haematocrit 0.40-0.54)."
+    url: "https://www.gloshospitals.nhs.uk/our-services/services-we-offer/pathology/haematology/haematology-reference-ranges/"
+    evidence: C
+    verified_via: retrieved
+    notes: "One hospital laboratory; not a population reference standard."
+  mifflin1990:
+    citation: "Mifflin MD, St Jeor ST, et al. A new predictive equation for resting energy expenditure in healthy individuals. Am J Clin Nutr 1990;51:241-247."
+    url: null
+    evidence: B
+    verified_via: "title and equation retrieved; journal details recalled"
+    notes: "Men: 10*weight_kg + 6.25*height_cm - 5*age_years + 5. Used only to seed resting_metabolic_rate."
+  dubois1916:
+    citation: "Du Bois D, Du Bois EF. A formula to estimate the approximate surface area if height and weight be known. Arch Intern Med 1916;17:863-871."
+    url: null
+    evidence: B
+    verified_via: "recalled, not retrieved"
+    notes: "Formula used for body_surface_area. Result for the ICRP reference male is about 1.89 m^2."

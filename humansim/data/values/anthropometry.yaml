@@ -1,0 +1,50 @@
+group: anthropometry
+description: >
+  Body size, lengths, breadths and girths. Height and mass are the ICRP 89 reference adult male.
+  Every other dimension is defined but has no value yet: it needs a real survey source
+  (e.g. ANSUR II or NHANES), not a recalled number.
+parameters:
+  - {id: height, name: "Height", unit: cm, kind: anchor, values: {male: {adult: 176.0}}, status: referenced, source_ref: pmc8646028, note: "ICRP 89 reference adult male. Read via a secondary paper (PMC8646028), not the original."}
+  - {id: body_mass, name: "Body mass", unit: kg, kind: anchor, values: {male: {adult: 73.0}}, status: referenced, source_ref: pmc8646028, note: "ICRP 89 reference adult male. Read via a secondary paper (PMC8646028), not the original."}
+  - {id: body_density, name: "Whole-body density", unit: "g/cm^3", kind: anchor}
+  - {id: leg_length_trochanteric, name: "Leg length, trochanteric", unit: cm, kind: anchor}
+  - {id: crotch_height, name: "Crotch height", unit: cm, kind: anchor}
+  - {id: hip_joint_height, name: "Hip joint centre height", unit: cm, kind: anchor}
+  - {id: sitting_height, name: "Sitting height, crown to rump", unit: cm, kind: anchor}
+  - {id: crown_to_crotch, name: "Crown to crotch", unit: cm, kind: anchor}
+  - {id: arm_span, name: "Arm span", unit: cm, kind: anchor}
+  - {id: arm_length, name: "Arm length, acromion to fingertip", unit: cm, kind: anchor}
+  - {id: standing_reach, name: "Standing reach", unit: cm, kind: anchor}
+  - {id: hand_length, name: "Hand length", unit: cm, kind: anchor}
+  - {id: foot_length, name: "Foot length", unit: cm, kind: anchor}
+  - {id: biacromial_breadth, name: "Biacromial breadth", unit: cm, kind: anchor}
+  - {id: bi_iliac_breadth, name: "Bi-iliac breadth", unit: cm, kind: anchor}
+  - {id: chest_circumference, name: "Chest circumference", unit: cm, kind: anchor}
+  - {id: chest_depth, name: "Chest depth", unit: cm, kind: anchor}
+  - {id: waist_circumference, name: "Waist circumference", unit: cm, kind: anchor}
+  - {id: hip_circumference, name: "Hip circumference", unit: cm, kind: anchor}
+  - {id: neck_circumference, name: "Neck circumference", unit: cm, kind: anchor}
+  - {id: upper_arm_circ_relaxed, name: "Upper arm circumference, relaxed", unit: cm, kind: anchor}
+  - {id: upper_arm_circ_flexed, name: "Upper arm circumference, flexed", unit: cm, kind: anchor}
+  - {id: forearm_circumference, name: "Forearm circumference, proximal", unit: cm, kind: anchor}
+  - {id: wrist_circumference, name: "Wrist circumference", unit: cm, kind: anchor}
+  - {id: thigh_circumference, name: "Thigh circumference, proximal", unit: cm, kind: anchor}
+  - {id: knee_circumference, name: "Knee circumference", unit: cm, kind: anchor}
+  - {id: calf_circumference, name: "Calf circumference", unit: cm, kind: anchor}
+  - {id: ankle_circumference, name: "Ankle circumference", unit: cm, kind: anchor}
+  - {id: penis_length_erect, name: "Penis length, erect", unit: cm, kind: anchor}
+  - {id: penis_girth_erect, name: "Penis girth, erect", unit: cm, kind: anchor}
+  - {id: head_circumference, name: "Head circumference", unit: cm, kind: anchor}
+  - {id: head_height, name: "Head height", unit: cm, kind: anchor}
+  - {id: head_length, name: "Head length", unit: cm, kind: anchor}
+  - {id: head_breadth, name: "Head breadth", unit: cm, kind: anchor}
+  - {id: neck_length, name: "Neck length", unit: cm, kind: anchor}
+  - {id: shoulder_height, name: "Shoulder height", unit: cm, kind: anchor}
+  - {id: torso_length, name: "Torso length, suprasternal to crotch", unit: cm, kind: anchor}
+  - {id: femur_length, name: "Femur length", unit: cm, kind: anchor}
+  - {id: tibia_length, name: "Tibia length", unit: cm, kind: anchor}
+  - {id: foot_breadth, name: "Foot breadth", unit: cm, kind: anchor}
+  - {id: ankle_height, name: "Ankle height", unit: cm, kind: anchor}
+  - {id: upper_arm_length, name: "Upper arm length", unit: cm, kind: anchor}
+  - {id: forearm_length, name: "Forearm length", unit: cm, kind: anchor}
+  - {id: hand_breadth, name: "Hand breadth", unit: cm, kind: anchor}

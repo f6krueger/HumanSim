@@ -1,0 +1,30 @@
+group: composition
+description: >
+  Tissue and organ masses. The organ and tissue masses below are the values I recall for the
+  ICRP 89 reference adult male. I could not open the original table, and the secondary pages
+  I could read did not contain it, so they are marked 'unsourced', not 'referenced'.
+  Replace them with checked values when the ICRP 89 table is attached.
+parameters:
+  - {id: skeletal_muscle_mass, name: "Skeletal muscle mass", unit: kg, kind: anchor, values: {male: {adult: 29.0}}, status: unsourced, note: "Recalled as ICRP 89 reference male; not verified."}
+  - {id: skeleton_mass, name: "Skeleton mass (total)", unit: kg, kind: anchor, values: {male: {adult: 10.5}}, status: unsourced, note: "Recalled as ICRP 89 reference male; not verified."}
+  - {id: adipose_tissue_mass, name: "Adipose tissue mass", unit: kg, kind: anchor, values: {male: {adult: 18.2}}, status: unsourced, note: "Recalled as ICRP 89 reference male; not verified. Adipose tissue is not pure fat."}
+  - {id: skin_mass, name: "Skin mass", unit: kg, kind: anchor, values: {male: {adult: 3.3}}, status: unsourced, note: "Recalled as ICRP 89 reference male; not verified."}
+  - {id: liver_mass, name: "Liver mass", unit: kg, kind: anchor, values: {male: {adult: 1.8}}, status: unsourced, note: "Recalled as ICRP 89 reference male; not verified."}
+  - {id: brain_mass, name: "Brain mass", unit: kg, kind: anchor, values: {male: {adult: 1.45}}, status: unsourced, note: "Recalled as ICRP 89 reference male; not verified."}
+  - {id: heart_mass, name: "Heart mass (tissue)", unit: kg, kind: anchor, values: {male: {adult: 0.33}}, status: unsourced, note: "Recalled as ICRP 89 reference male; not verified."}
+  - {id: kidneys_mass, name: "Kidneys mass (both)", unit: kg, kind: anchor, values: {male: {adult: 0.31}}, status: unsourced, note: "Recalled as ICRP 89 reference male; not verified."}
+  - {id: lungs_mass, name: "Lungs mass", unit: kg, kind: anchor, values: {male: {adult: 1.2}}, status: unsourced, note: "Recalled as ICRP 89 reference male, which I believe includes blood; not verified. If so, the tissue budget double-counts some blood."}
+  - {id: spleen_mass, name: "Spleen mass", unit: kg, kind: anchor, values: {male: {adult: 0.15}}, status: unsourced, note: "Recalled as ICRP 89 reference male; not verified."}
+  - {id: pancreas_mass, name: "Pancreas mass", unit: kg, kind: anchor, values: {male: {adult: 0.14}}, status: unsourced, note: "Recalled as ICRP 89 reference male; not verified."}
+  - {id: thyroid_mass, name: "Thyroid mass", unit: kg, kind: anchor, values: {male: {adult: 0.020}}, status: unsourced, note: "Recalled as ICRP 89 reference male; not verified."}
+  - {id: muscle_density, name: "Skeletal muscle density", unit: "g/cm^3", kind: anchor, values: {male: {adult: 1.06}}, status: unsourced, note: "Widely quoted figure; not retrieved."}
+  - {id: glycogen_total_mass, name: "Glycogen, total body (full)", unit: kg, kind: anchor}
+  - {id: cortical_bone_density, name: "Cortical bone density", unit: "g/cm^3", kind: anchor}
+  - {id: trabecular_bone_density, name: "Trabecular bone density", unit: "g/cm^3", kind: anchor}
+  - {id: femoral_shaft_diameter, name: "Femoral shaft diameter", unit: cm, kind: anchor}
+  - {id: femoral_cortical_wall, name: "Femoral cortical wall thickness", unit: mm, kind: anchor}
+  - {id: lower_limb_mass_fraction, name: "Lower limb mass fraction", unit: dimensionless, kind: anchor}
+  - {id: cranial_capacity, name: "Cranial capacity", unit: mL, kind: anchor}
+  - {id: testis_volume, name: "Testis volume (each)", unit: mL, kind: anchor}
+  - {id: molar_bite_force, name: "Molar bite force", unit: N, kind: anchor}
+  - {id: molar_enamel_thickness, name: "Molar enamel thickness", unit: mm, kind: anchor}
