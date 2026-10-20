@@ -96,22 +96,77 @@ def range_flags(state: State) -> CheckResult:
     return CheckResult("range_flags", "pass", "All stored values with a known range are inside it.")
 
 
-def female_rule_coverage(state: State) -> CheckResult:
-    if state.context.sex != "female":
-        return CheckResult("female_rule_coverage", "skipped", "not a female context")
+def sex_rule_coverage(state: State) -> CheckResult:
+    """Parameters whose value exists only for the other sex and have no sex rule to convert it."""
+    other = "male" if state.context.sex == "female" else "female"
     no_rule = sorted(i for i, f in state.flags.items() if "no_sex_rule" in f)
     if no_rule:
         shown = ", ".join(no_rule[:8]) + (f", and {len(no_rule) - 8} more" if len(no_rule) > 8 else "")
         return CheckResult(
-            "female_rule_coverage", "warn",
-            f"{len(no_rule)} parameter(s) have a male value but no sex rule, so they are "
-            f"empty (or flagged, with keep_unadjusted): {shown}", {"no_sex_rule": no_rule})
-    return CheckResult("female_rule_coverage", "pass", "Every parameter with a male value has a sex rule.")
+            "sex_rule_coverage", "warn",
+            f"{len(no_rule)} parameter(s) have a {other} value but no {state.context.sex} value and no "
+            f"sex rule, so they are empty (or flagged, with keep_unadjusted): {shown}",
+            {"no_sex_rule": no_rule})
+    return CheckResult("sex_rule_coverage", "pass",
+                       f"Every parameter with a {other} value also has a {state.context.sex} value or a sex rule.")
+
+
+RMR_RATES = {"liver_mass": 200.0, "brain_mass": 240.0, "heart_mass": 440.0, "kidneys_mass": 440.0,
+             "skeletal_muscle_mass": 13.0, "adipose_tissue_mass": 4.5}
+RMR_RESIDUAL_RATE = 12.0  # kcal/kg/day (Wang 2010, secondary source)
+
+
+def rmr_organ_crosscheck(state: State, warn: float = 0.15) -> CheckResult:
+    """Independent cross-check: the organ-sum metabolic rate against the stored (equation-based) one."""
+    need = list(RMR_RATES) + ["body_mass", "resting_metabolic_rate"]
+    if any(state.get(i) is None for i in need):
+        return CheckResult("rmr_organ_crosscheck", "skipped", "organ masses or metabolic rate missing")
+    residual = max(state.get("body_mass") - sum(state.get(i) for i in RMR_RATES), 0.0)
+    total = sum(RMR_RATES[i] * state.get(i) for i in RMR_RATES) + RMR_RESIDUAL_RATE * residual
+    stored = state.get("resting_metabolic_rate")
+    diff = total / stored - 1.0
+    details = {"organ_sum_kcal_day": round(total), "stored_kcal_day": round(stored), "difference": round(diff, 3)}
+    msg = (f"Organ-sum metabolic rate {total:.0f} kcal/day vs stored {stored:.0f} ({diff:+.1%}). "
+           f"The two come from different sources, so agreement is a real check.")
+    return CheckResult("rmr_organ_crosscheck", "warn" if abs(diff) > warn else "pass", msg, details)
+
+
+def solver_converged(state: State) -> CheckResult:
+    if not state.solver:
+        return CheckResult("solver_converged", "skipped", "solver not run (use --solve)")
+    if not state.solver["converged"]:
+        return CheckResult("solver_converged", "fail",
+                           f"Solver did not converge in {state.solver['iterations']} iterations; "
+                           f"a feedback loop has gain of 1 or more. Do not trust these values.")
+    return CheckResult("solver_converged", "pass", f"Solver converged in {state.solver['iterations']} iteration(s).")
+
+
+def coupling_checks(registry: Registry, couplings, sources: dict[str, dict] | None = None) -> list[CheckResult]:
+    problems: list[str] = []
+    for c in couplings:
+        if c.target not in registry:
+            problems.append(f"{c.id}: unknown target {c.target!r}")
+        elif registry[c.target].kind == "derived":
+            problems.append(f"{c.id}: targets derived parameter {c.target!r}")
+        for pid in list(c.args.get("inputs", {})) + list(c.args.get("rates", {})) + list(c.args.get("tissues", [])) \
+                + [c.args[k] for k in ("demand", "organ", "total") if k in c.args]:
+            if pid not in registry:
+                problems.append(f"{c.id}: unknown input {pid!r}")
+        if c.source_ref and sources is not None and c.source_ref not in sources:
+            problems.append(f"{c.id}: unknown source {c.source_ref!r}")
+        if c.status == "referenced" and not c.source_ref:
+            problems.append(f"{c.id}: status referenced but no source_ref")
+    targets = [c.target for c in couplings]
+    for t in sorted({t for t in targets if targets.count(t) > 1}):
+        problems.append(f"{t}: more than one coupling targets it")
+    return [CheckResult("coupling_data", "fail" if problems else "pass",
+                        "; ".join(problems) if problems else f"{len(list(couplings))} couplings are consistent.",
+                        {"problems": problems})]
 
 
 def state_checks(state: State) -> list[CheckResult]:
     return [tissue_mass_budget(state), segment_stature_sum(state), range_flags(state),
-            female_rule_coverage(state)]
+            sex_rule_coverage(state), rmr_organ_crosscheck(state), solver_converged(state)]
 
 
 def modifier_checks(registry: Registry, modifiers, sources: dict[str, dict] | None = None) -> list[CheckResult]:
@@ -130,6 +185,15 @@ def modifier_checks(registry: Registry, modifiers, sources: dict[str, dict] | No
             problems.append(f"{m.id}: unknown source {m.source_ref!r}")
         if m.status == "referenced" and not m.source_ref:
             problems.append(f"{m.id}: status referenced but no source_ref")
+    for m in modifiers:
+        if m.stage != "sex" or m.op != "ratio" or dict(m.when) != {"sex": "female"}:
+            continue
+        for pid, x in m.effects.items():
+            if pid in registry:
+                a, b = registry[pid].baseline("male", "adult"), registry[pid].baseline("female", "adult")
+                if a and b and abs(b / a - x) > 1e-3:
+                    problems.append(f"{m.id}: rule ratio {x} disagrees with stored pair ratio {b / a:.5f}; "
+                                    f"regenerate with tools/build_sex_rules.py")
     dups = {k: v for k, v in seen.items() if len(v) > 1}
     for (pid, _), ids in dups.items():
         problems.append(f"duplicate sex rules for {pid!r}: {', '.join(ids)} (would apply twice)")
@@ -138,7 +202,8 @@ def modifier_checks(registry: Registry, modifiers, sources: dict[str, dict] | No
                         {"problems": problems})]
 
 
-def dataset_checks(registry: Registry, sources: dict[str, dict]) -> list[CheckResult]:
+def dataset_checks(registry: Registry, sources: dict[str, dict], extra_used=()) -> list[CheckResult]:
+    """extra_used: source ids cited outside the registry (modifiers, couplings, validation files)."""
     results: list[CheckResult] = []
 
     bad_refs = []
@@ -161,7 +226,7 @@ def dataset_checks(registry: Registry, sources: dict[str, dict]) -> list[CheckRe
         f"Status 'referenced' without source_ref: {', '.join(no_ref)}" if no_ref
         else "Every referenced value names a source.", {"bad": no_ref}))
 
-    used = {r for p in registry for r in (p.source_ref, p.range_source_ref) if r}
+    used = {r for p in registry for r in (p.source_ref, p.range_source_ref) if r} | set(extra_used)
     used |= {sources[r]["primary"] for r in used if r in sources and sources[r].get("primary")}
     unused = sorted(set(sources) - used)
     results.append(CheckResult(

@@ -48,3 +48,15 @@ sources:
     evidence: B
     verified_via: "recalled, not retrieved"
     notes: "Formula used for body_surface_area. Result for the ICRP reference male is about 1.89 m^2."
+  nchs:
+    citation: "CDC/NCHS FastStats: Body Measurements. Mean height, weight and waist circumference of US adults aged 20 and over, from the August 2021-August 2023 National Health and Nutrition Examination Survey."
+    url: "https://www.cdc.gov/nchs/fastats/body-measurements.htm"
+    evidence: B
+    verified_via: retrieved
+    notes: "General US population (not military), so it differs from ANSUR II in mean mass and age mix. Used only as an independent check on female/male ratios, not as a baseline."
+  wang2010:
+    citation: "Wang Z, Ying Z, Bosy-Westphal A, et al. Specific metabolic rates of major organs and tissues across adulthood: evaluation by mechanistic model of resting energy expenditure. Am J Clin Nutr 2010;92(6):1369-1377."
+    url: null
+    evidence: B
+    verified_via: "values (liver 200, brain 240, heart 440, kidneys 440, skeletal muscle 13, adipose tissue 4.5 kcal/kg/day; residual 12) read on a secondary page (BioNumbers); original article not read"
+    notes: "The residual rate of 12 kcal/kg/day is my reading of the secondary page for 'other tissues' and should be checked against the article."

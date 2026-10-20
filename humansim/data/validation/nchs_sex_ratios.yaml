@@ -1,0 +1,8 @@
+# Independent check on sex ratios: US adults 20+, NHANES August 2021-August 2023 (CDC FastStats).
+# The ANSUR II sex rules were NOT fitted to this. Different population, so expect differences.
+source_ref: nchs
+population: "US adults aged 20 and over, general population"
+parameters:
+  height:               {unit: cm, male: 175.01, female: 161.29}   # 68.9 in, 63.5 in
+  body_mass:            {unit: kg, male: 90.26,  female: 77.93}    # 199.0 lb, 171.8 lb
+  waist_circumference:  {unit: cm, male: 103.12, female: 97.79}    # 40.6 in, 38.5 in

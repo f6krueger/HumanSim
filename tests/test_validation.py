@@ -16,9 +16,9 @@ def test_female_file_is_consistent_with_registry(registry, female):
     assert female["source_ref"] == "ansur2"
 
 
-def test_female_targets_are_not_baseline_values(registry):
-    # Female data must stay a validation target; the sex rules derive the female body.
-    assert registry["height"].baseline("female", "adult") is None
+def test_female_is_a_stored_baseline(registry):
+    assert registry["height"].baseline("female", "adult") == pytest.approx(162.85)
+    assert registry["height"].baseline("female", "adult") < registry["height"].baseline("male", "adult")
 
 
 def test_every_validation_parameter_has_a_male_value(registry, female):
@@ -53,7 +53,8 @@ def test_male_values_are_in_plausible_ranges(registry):
 def test_spread_accessor(registry):
     assert registry["body_mass"].spread("male", "adult") > 5
     assert registry["liver_mass"].spread("male", "adult") is None
-    assert registry["height"].spread("female", "adult") is None
+    assert registry["height"].spread("female", "adult") > 5
+    assert registry["hematocrit"].spread("female", "adult") is None
 
 
 def test_loader_rejects_bad_sd(tmp_path):
@@ -79,3 +80,15 @@ def test_problems_are_reported(registry, female):
     assert any("not a registry parameter" in m for m in msgs)
     assert any("unit" in m for m in msgs)
     assert any("outside its own" in m for m in msgs)
+
+
+def test_independent_nchs_ratios_are_close_to_ansur_ratios(registry):
+    nchs = load_validation("nchs_sex_ratios")
+    assert nchs["source_ref"] == "nchs"
+    for pid, rec in nchs["parameters"].items():
+        model = registry[pid].baseline("female", "adult") / registry[pid].baseline("male", "adult")
+        check = rec["female"] / rec["male"]
+        assert model == pytest.approx(check, rel=0.10), pid  # different populations: 10% is loose on purpose
+    # Documented limit: the army sample has a lower female/male mass ratio than the general public.
+    m = nchs["parameters"]["body_mass"]
+    assert registry["body_mass"].baseline("female", "adult") / registry["body_mass"].baseline("male", "adult") < m["female"] / m["male"]

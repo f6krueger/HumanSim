@@ -56,32 +56,46 @@ def format_compare(male: State, female: State) -> str:
         f"{a:<{w[0]}}  {b:>{w[1]}}  {c:>{w[2]}}  {d:>{w[3]}}  {e:<{w[4]}}  {n}" for a, b, c, d, e, n in rows)
 
 
-def format_validation(registry: Registry, modifiers, doc: dict) -> tuple[str, float]:
-    """Compare the derived female with the ANSUR II female means. Returns (text, worst % difference)."""
-    from .context import Context, resolve
+def format_validation(registry: Registry, modifiers, doc: dict, independent: dict | None = None) -> tuple[str, float]:
+    """Two checks on the sex data. Returns (text, worst disagreement between a rule and its stored pair).
+
+    1. Consistency: every sex rule must equal the ratio of the stored female and male values.
+    2. Independent: female/male ratios from a second dataset (NCHS) against the ANSUR II ratios.
+    """
     from .validation import scaling_analysis
 
-    female = resolve(registry, Context(sex="female"), modifiers)
     analysis = {r["id"]: r for r in scaling_analysis(doc, registry)}
-    lines = [
-        "Calibration check: derived female vs ANSUR II female means.",
-        "The rules were fitted to these means, so agreement is expected. This is a consistency",
-        "check, NOT independent validation.",
-        "",
-        f"{'parameter':<26}{'derived':>10}{'ANSUR II':>10}{'diff':>8}  rule type",
-    ]
+    rules = {pid: m for m in modifiers if m.stage == "sex" and m.op == "ratio" for pid in m.effects}
+    lines = ["1. Consistency: sex rule ratio vs the stored female/male pair.",
+             "   Both sexes are stored; the ratios are computed from those pairs, so they agree by",
+             "   construction. This catches stale rule files, not scientific error.", "",
+             f"{'parameter':<26}{'male':>10}{'female':>10}{'F/M':>8}{'rule':>8}  rule type"]
     worst = 0.0
-    for pid, rec in doc["parameters"].items():
-        d = female.get(pid)
-        if d is None:
-            lines.append(f"{pid:<26}{'-':>10}{rec['mean']:>10.2f}{'':>8}  NO DERIVED VALUE")
+    for p in registry:
+        m, f = p.baseline("male", "adult"), p.baseline("female", "adult")
+        if p.kind == "derived" or m is None or f is None:
+            continue
+        rule = rules.get(p.id)
+        rr = rule.effects[p.id] if rule else None
+        if rr is None:
+            lines.append(f"{p.id:<26}{m:>10.2f}{f:>10.2f}{f / m:>8.3f}{'-':>8}  NO RULE")
             worst = float("inf")
             continue
-        diff = d / rec["mean"] - 1.0
-        worst = max(worst, abs(diff))
-        lines.append(f"{pid:<26}{d:>10.2f}{rec['mean']:>10.2f}{diff:>+8.2%}  {analysis[pid]['type']}")
-    lines.append("")
-    lines.append(f"Largest difference: {worst:.3%}")
+        worst = max(worst, abs(rr - f / m))
+        lines.append(f"{p.id:<26}{m:>10.2f}{f:>10.2f}{f / m:>8.3f}{rr:>8.3f}  {rule.rule_type}")
+    lines += ["", f"Largest rule/pair disagreement: {worst:.5f}"]
+
+    if independent:
+        lines += ["", f"2. Independent check: {independent.get('population', 'second dataset')}.",
+                  "   Not used to build any rule. A different population (general public vs US Army),",
+                  "   so differences are expected; large ones would flag a problem.", "",
+                  f"{'parameter':<26}{'model F/M':>10}{'check F/M':>10}{'diff':>8}"]
+        for pid, rec in independent["parameters"].items():
+            m, f = registry[pid].baseline("male", "adult"), registry[pid].baseline("female", "adult")
+            if m is None or f is None:
+                continue
+            model, check = f / m, rec["female"] / rec["male"]
+            lines.append(f"{pid:<26}{model:>10.3f}{check:>10.3f}{model / check - 1:>+8.1%}")
     return "\n".join(lines), worst
 
 

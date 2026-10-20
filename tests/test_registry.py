@@ -46,8 +46,9 @@ def test_reference_male_anchor_values(registry):
     assert registry["blood_volume"].baseline("male", "adult") == 5.3
 
 
-def test_no_female_data_yet(registry):
-    assert registry["height"].baseline("female", "adult") is None
+def test_female_data_stored_where_available(registry):
+    assert registry["height"].baseline("female", "adult") is not None
+    assert registry["brain_metabolic_load"].baseline("female", "adult") is None
 
 
 def test_loader_rejects_bad_files(tmp_path):

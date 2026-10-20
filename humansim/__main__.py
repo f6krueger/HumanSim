@@ -5,10 +5,12 @@ from __future__ import annotations
 import argparse
 import sys
 
-from .checks import dataset_checks, modifier_checks, state_checks
+from .checks import coupling_checks, dataset_checks, modifier_checks, state_checks
 from .context import Context, resolve
+from .couplings import load_couplings
 from .modifiers import load_modifiers
 from .registry import Registry
+from .solver import solve
 from .report import format_compare, format_coverage, format_state, format_validation
 from .sources import load_sources
 from .units import parse_value
@@ -56,8 +58,10 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--age", default="adult")
         p.add_argument("--set", action="append", metavar="ID=VALUE",
                        help="override a parameter, e.g. body_mass=90 or body_mass='198 lb'")
+        p.add_argument("--solve", action="store_true",
+                       help="run the steady-state solver so edits ripple through the couplings")
         p.add_argument("--keep-unadjusted", action="store_true",
-                       help="female only: keep male values that have no sex rule (flagged no_sex_rule)")
+                       help="keep other-sex values that have no sex rule (flagged no_sex_rule)")
 
     p_show = sub.add_parser("show", help="print resolved values")
     add_context_args(p_show)
@@ -72,8 +76,8 @@ def main(argv: list[str] | None = None) -> int:
     p_chk = sub.add_parser("check", help="run consistency checks")
     add_context_args(p_chk)
 
-    sub.add_parser("compare", help="male and derived female side by side")
-    sub.add_parser("validate", help="derived female vs the ANSUR II female means")
+    sub.add_parser("compare", help="male and female side by side")
+    sub.add_parser("validate", help="sex rules vs stored pairs, and ANSUR II ratios vs an independent dataset")
 
     args = ap.parse_args(argv)
     reg = Registry.load()
@@ -88,17 +92,25 @@ def main(argv: list[str] | None = None) -> int:
                              resolve(reg, Context(sex="female"), modifiers)))
         return 0
     if args.cmd == "validate":
-        text, worst = format_validation(reg, modifiers, load_validation("ansur2_female"))
+        text, worst = format_validation(reg, modifiers, load_validation("ansur2_female"),
+                                        load_validation("nchs_sex_ratios"))
         print(text)
         return 0 if worst < 1e-3 else 1
     try:
-        state = resolve(reg, _context(args, reg), modifiers)
+        ctx = _context(args, reg)
+        state = (solve(reg, ctx, modifiers, load_couplings(reg)) if args.solve
+                 else resolve(reg, ctx, modifiers))
     except (ValueError, KeyError) as exc:
         raise SystemExit(f"error: {exc.args[0] if exc.args else exc}") from None
 
     if args.cmd == "show":
         print(format_state(state, group=args.group, only_changed=args.changed,
                            hide_missing=not args.all))
+        if state.solver:
+            sv = state.solver
+            print(f"\nSolver: {'converged' if sv['converged'] else 'DID NOT CONVERGE'} in {sv['iterations']} "
+                  f"iteration(s); {len(sv['skipped'])} of {sv['couplings']} couplings skipped "
+                  f"(missing data or pinned by an edit).")
         if args.trace:
             print("\nTrace:")
             for t in state.trace:
@@ -108,8 +120,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     sources = load_sources()
-    results = (state_checks(state) + dataset_checks(reg, sources)
-               + modifier_checks(reg, modifiers, sources))
+    couplings = load_couplings(reg)
+    cited = ({m.source_ref for m in modifiers} | {c.source_ref for c in couplings}
+             | {load_validation("nchs_sex_ratios")["source_ref"]}) - {None}
+    results = (state_checks(state) + dataset_checks(reg, sources, cited)
+               + modifier_checks(reg, modifiers, sources)
+               + coupling_checks(reg, couplings, sources))
     return _print_checks(results)
 
 

@@ -1,4 +1,4 @@
-# Human Reference Simulation: Specification (v0.2 draft)
+# Human Reference Simulation: Specification (v0.3 draft)
 
 Working name: `humansim` (rename any time). Code license: Apache-2.0. Data license: CC BY 4.0 (both easy to change; see section 14).
 
@@ -129,8 +129,8 @@ docs/
 Each phase ends with something usable.
 
 1. **Core:** registry, units, context and modifier system, derived layer, real adult male baseline.
-2. **Sex module:** female derivation, validated against the reference female.
-3. **Steady-state solver:** metabolic chain and liver test, three-tier logic.
+2. **Sex module:** both sexes stored; sex rules fill gaps in either direction; checked against an independent dataset. (Built.)
+3. **Steady-state solver:** metabolic chain and liver test; deadband on compensation couplings, accounting couplings immediate, validity ranges. Built as reference-calibrated ratio couplings (see README). Three tiers in the original sense (reference / compensation / viability) are only partly present: viability limits are still unpopulated, so "range undefined" applies.
 4. **Development module:** age axis with ICRP anchor ages and growth curves.
 5. **Dynamic solver and hormones:** first axis (sex hormones), then others.
 6. **Pharmacology:** PBPK on the existing anatomy, with a small seed drug set.

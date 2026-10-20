@@ -1,7 +1,7 @@
 import pytest
 
 from humansim import Context, Modifier, Parameter, Registry, load_modifiers, resolve
-from humansim.checks import female_rule_coverage, modifier_checks, range_flags
+from humansim.checks import sex_rule_coverage, modifier_checks, range_flags
 from humansim.validation import (classify_ratio, load_validation, scaling_analysis,
                                  scaling_expectation)
 
@@ -26,22 +26,63 @@ def male(registry, mods):
     return resolve(registry, Context(sex="male"), mods)
 
 
-# --- calibration (consistency, not independent validation) --------------------------------
-def test_derived_female_reproduces_ansur_female_means(female, female_doc):
+# --- both sexes are stored --------------------------------------------------------------------
+def test_female_values_are_stored_not_derived(registry, female, female_doc):
     for pid, rec in female_doc["parameters"].items():
-        assert female.get(pid) == pytest.approx(rec["mean"], rel=1e-3), pid
+        assert registry[pid].baseline("female", "adult") == pytest.approx(rec["mean"], abs=0.006), pid
+        assert female.get(pid) == registry[pid].baseline("female", "adult")
+        assert "derived_from_male" not in female.flags[pid]
+        assert registry[pid].spread("female", "adult") == pytest.approx(rec["sd"], abs=0.006)
 
 
-def test_male_is_unchanged_by_sex_rules(registry, mods):
-    with_rules = resolve(registry, Context(sex="male"), mods)
-    without = resolve(registry, Context(sex="male"), [])
-    assert with_rules.values == without.values
-    assert with_rules.trace == []
+def test_sex_rules_do_not_alter_stored_values(registry, mods):
+    for sex in ("male", "female"):
+        with_rules = resolve(registry, Context(sex=sex), mods)
+        without = resolve(registry, Context(sex=sex), [])
+        assert with_rules.get("height") == without.get("height")
+        assert with_rules.get("body_mass") == without.get("body_mass")
+    assert resolve(registry, Context(sex="male"), mods).trace == []
+
+
+def test_rules_agree_with_stored_pairs(registry, mods):
+    assert modifier_checks(registry, mods)[0].status == "pass"
+    bad = Modifier("x", "sex", "ratio", {"height": 0.5}, when={"sex": "female"})
+    assert modifier_checks(registry, [bad])[0].status == "fail"
+
+
+def _only_one_sex(sex):
+    a = Parameter(id="a", name="A", unit="kg", kind="anchor", group="g", status="referenced",
+                  source_ref="s", values={sex: {"adult": 100.0 if sex == "male" else 60.0}})
+    return Registry({"a": a})
+
+
+def test_female_derived_from_male_and_male_derived_from_female_are_inverse():
+    rule = Modifier("r", "sex", "ratio", {"a": 0.6}, when={"sex": "female"})
+    f = resolve(_only_one_sex("male"), Context(sex="female"), [rule])
+    assert f.get("a") == pytest.approx(60.0) and "derived_from_male" in f.flags["a"]
+    m = resolve(_only_one_sex("female"), Context(sex="male"), [rule])
+    assert m.get("a") == pytest.approx(100.0) and "derived_from_female" in m.flags["a"]
+    assert "inverse" in m.trace[0].note
+    # round trip
+    assert m.get("a") * 0.6 == pytest.approx(60.0)
+
+
+def test_female_only_value_without_rule_is_empty_for_male():
+    s = resolve(_only_one_sex("female"), Context(sex="male"), [])
+    assert s.get("a") is None and s.flags["a"] == {"missing", "no_sex_rule"}
+    kept = resolve(_only_one_sex("female"), Context(sex="male", keep_unadjusted=True), [])
+    assert kept.get("a") == 60.0 and "derived_from_female" in kept.flags["a"]
+
+
+def test_set_rule_cannot_be_inverted_for_male():
+    rule = Modifier("r", "sex", "set", {"a": 60.0}, when={"sex": "female"})
+    s = resolve(_only_one_sex("female"), Context(sex="male"), [rule])
+    assert s.get("a") is None and "no_sex_rule" in s.flags["a"]
 
 
 def test_every_sex_rule_targets_a_valid_parameter_once(registry, mods):
     assert modifier_checks(registry, mods)[0].status == "pass"
-    assert len(mods) == 38
+    assert len(mods) == 54
     assert {m.stage for m in mods} == {"sex"}
     assert all(m.when == {"sex": "female"} for m in mods)
 
@@ -58,7 +99,8 @@ def test_rule_types_are_labelled_and_sourced(mods):
 
 
 # --- the ICRP female/male pairs -------------------------------------------------------------
-def test_icrp_female_values(female):
+def test_icrp_female_values(female, registry):
+    assert registry["hematocrit"].baseline("female", "adult") == 0.42
     assert female.get("hematocrit") == pytest.approx(0.42, abs=1e-3)
     assert female.get("cardiac_output") == pytest.approx(5.9, abs=1e-3)
     assert female.get("blood_volume") == pytest.approx(3.9, abs=1e-3)
@@ -66,17 +108,21 @@ def test_icrp_female_values(female):
 
 # --- parameters without a rule are not silently filled with male values ---------------------
 def test_no_rule_means_no_value_for_female(female, male):
-    assert male.get("liver_mass") is not None
-    assert female.get("liver_mass") is None
-    assert female.flags["liver_mass"] == {"missing", "no_sex_rule"}
-    assert female.get("hepatic_blood_flow") is None  # derived from a parameter with no female value
+    assert male.get("brain_metabolic_load") is not None
+    assert female.get("brain_metabolic_load") is None
+    assert female.flags["brain_metabolic_load"] == {"missing", "no_sex_rule"}
 
 
 def test_keep_unadjusted_keeps_the_male_value_but_flags_it(registry, mods, male):
     s = resolve(registry, Context(sex="female", keep_unadjusted=True), mods)
-    assert s.get("liver_mass") == male.get("liver_mass")
-    assert {"derived_from_male", "no_sex_rule"} <= s.flags["liver_mass"]
-    assert "no_sex_rule" in s.flags["hepatic_blood_flow"] or s.get("hepatic_blood_flow") is not None
+    assert s.get("brain_metabolic_load") == male.get("brain_metabolic_load")
+    assert {"derived_from_male", "no_sex_rule"} <= s.flags["brain_metabolic_load"]
+
+
+def test_female_hemoglobin_follows_hematocrit_ratio(female, male):
+    assert female.get("hemoglobin") == pytest.approx(male.get("hemoglobin") * 0.42 / 0.45, rel=1e-3)
+    assert 12.0 < female.get("hemoglobin") < 16.0
+    assert "modifier_unsourced" in female.flags["hemoglobin"]
 
 
 def test_assumed_neutral_parameters_are_kept_and_flagged_unsourced(female):
@@ -93,16 +139,16 @@ def test_female_derived_values_follow_from_derived_inputs(female, male):
 
 
 def test_female_edits_override_and_propagate(registry, mods):
-    s = resolve(registry, Context(sex="female", edits={"body_mass": 80.0, "liver_mass": 1.5}), mods)
+    s = resolve(registry, Context(sex="female", edits={"body_mass": 80.0, "brain_metabolic_load": 15.0}), mods)
     assert s.get("body_mass") == 80.0
-    assert s.get("liver_mass") == 1.5 and s.flags["liver_mass"] == {"edited"}
+    assert s.get("brain_metabolic_load") == 15.0 and s.flags["brain_metabolic_load"] == {"edited"}
     assert [t.stage for t in s.trace if t.param == "body_mass"] == ["sex", "edit"]
 
 
 def test_female_coverage_check_lists_missing_rules(female):
-    r = female_rule_coverage(female)
-    assert r.status == "warn" and "liver_mass" in r.details["no_sex_rule"]
-    assert female_rule_coverage(resolve(Registry.load(), Context())).status == "skipped"
+    r = sex_rule_coverage(female)
+    assert r.status == "warn" and "brain_metabolic_load" in r.details["no_sex_rule"]
+    assert sex_rule_coverage(resolve(Registry.load(), Context())).status == "pass"  # no female-only values yet
 
 
 # --- reference ranges are per sex -------------------------------------------------------------
@@ -115,9 +161,9 @@ def test_male_range_is_not_applied_to_a_female(registry, mods):
     # 185 cm is inside the male range (up to 189.7) but far above the female 97.5th percentile (175.8).
     assert "outside_reference_range" not in resolve(registry, Context(edits={"height": 185.0}), mods).flags["height"]
     assert "outside_reference_range" in resolve(registry, Context(sex="female", edits={"height": 185.0}), mods).flags["height"]
-    # Haemoglobin only has a male range, so a female value is never flagged against it.
-    s = resolve(registry, Context(sex="female", edits={"hemoglobin": 25.0}), mods)
-    assert "outside_reference_range" not in s.flags["hemoglobin"]
+    # Haemoglobin: 14 g/dL is inside the male range (13-18) but 18 is outside the female range (11.5-16.5).
+    assert "outside_reference_range" not in resolve(registry, Context(edits={"hemoglobin": 17.5}), mods).flags["hemoglobin"]
+    assert "outside_reference_range" in resolve(registry, Context(sex="female", edits={"hemoglobin": 17.5}), mods).flags["hemoglobin"]
 
 
 # --- stored female values take precedence over rules ------------------------------------------
@@ -171,8 +217,8 @@ def test_cli_sex_commands():
     out = run("compare")
     assert out.returncode == 0 and "F/M" in out.stdout and "hematocrit" in out.stdout
     out = run("validate")
-    assert out.returncode == 0 and "NOT independent validation" in out.stdout
+    assert out.returncode == 0 and "Independent check" in out.stdout and "body_mass" in out.stdout
     out = run("show", "--sex", "female", "--group", "anthropometry", "--trace")
     assert out.returncode == 0 and "sex_female_height" in out.stdout
     out = run("check", "--sex", "female")
-    assert out.returncode == 0 and "female_rule_coverage" in out.stdout and "modifier_data" in out.stdout
+    assert out.returncode == 0 and "sex_rule_coverage" in out.stdout and "modifier_data" in out.stdout
