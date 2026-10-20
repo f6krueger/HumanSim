@@ -26,7 +26,7 @@ OUT = ROOT / "humansim" / "data" / "modifiers" / "sex_female.yaml"
 
 
 # Assumed to have no sex difference. Not sourced; stated so the model does not leave them empty.
-NEUTRAL = ["core_temperature", "sao2", "pao2", "muscle_density", "hepatic_flow_fraction"]
+NEUTRAL = ["core_temperature", "sao2", "pao2", "muscle_density"]
 
 ICRP_CAVEAT = (" Compares an ICRP 89 reference female (60 kg) with a reference male (73 kg), so the ratio "
                "includes body-size differences. Phase 3 separates size scaling from sex effects.")
@@ -71,6 +71,8 @@ def main() -> None:
             f"rule_type: {rtype}, note: {q(note)}}}")
 
     for pid in NEUTRAL:
+        if reg[pid].baseline("female", "adult") is not None:
+            continue  # a stored female value makes a neutral rule redundant (and a duplicate)
         counts["assumed_neutral"] = counts.get("assumed_neutral", 0) + 1
         lines.append(
             f"  - {{id: sex_female_{pid}, stage: sex, op: ratio, effects: {{{pid}: 1.0}}, "

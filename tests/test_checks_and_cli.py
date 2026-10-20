@@ -5,18 +5,21 @@ from humansim import Context, resolve
 from humansim.checks import range_flags, segment_stature_sum, state_checks, tissue_mass_budget
 
 
-def test_tissue_budget_warns_about_population_mismatch_at_baseline(registry):
-    r = tissue_mass_budget(resolve(registry, Context()))
-    assert r.status == "warn"
-    assert "different populations" in r.message
-    assert r.details["missing"] == []
-    assert r.details["unassigned_kg"] > 8
+def test_tissue_budget_matches_icrp_coverage_for_each_sex_and_age(registry):
+    # ICRP 89 states that the listed tissues are 96% of body mass; the transcribed rows must reproduce it
+    for sex in ("male", "female"):
+        for age in ("adult", 15, 10, 5, 1, 0):
+            r = tissue_mass_budget(resolve(registry, Context(sex=sex, age=age)))
+            assert r.status == "pass", (sex, age, r.message)
+            assert 0.94 < r.details["listed_total_kg"] / r.details["basis_mass_kg"] < 0.98
+            assert r.details["basis"] == "reference_body_mass"
 
 
-def test_tissue_budget_passes_when_mass_matches_the_organ_data(registry):
+def test_tissue_budget_uses_body_mass_once_something_is_edited(registry):
     r = tissue_mass_budget(resolve(registry, Context(edits={"body_mass": 73.0})))
-    assert r.status == "pass"
-    assert 0 <= r.details["unassigned_kg"] < 3
+    assert r.details["basis"] == "body_mass" and r.status == "pass"
+    r = tissue_mass_budget(resolve(registry, Context(edits={"body_mass": 85.5})))
+    assert r.status == "warn" and "96%" in r.message  # the organ data do not cover an 85 kg body
 
 
 def test_tissue_budget_fails_when_tissues_exceed_mass(registry):
@@ -48,7 +51,7 @@ def test_range_flags_check(registry):
 
 
 def test_state_checks_run(registry):
-    assert len(state_checks(resolve(registry, Context()))) == 7
+    assert len(state_checks(resolve(registry, Context()))) == 9
 
 
 def _cli(*args):

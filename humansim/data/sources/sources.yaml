@@ -8,8 +8,8 @@ sources:
     citation: "ICRP, 2002. Basic Anatomical and Physiological Data for Use in Radiological Protection: Reference Values. ICRP Publication 89. Annals of the ICRP 32(3-4)."
     url: null
     evidence: A
-    verified_via: "secondary pages only (PMC8646028, PMC6343858); original not read"
-    notes: "Cardiac output 6.5 L/min, blood volume 5300 cm^3 and hepatic flow fraction were read from papers quoting it. (Height 176 cm and mass 73 kg are the ICRP reference man, but the model now uses ANSUR II for height and mass.) Organ masses in composition.yaml are recalled, not read."
+    verified_via: "read from the PDF supplied by the user (text layer, chapter 2 summary tables 2.8-2.44 and section 7.4). The transcription was checked against the report's own totals: Table 2.8 tissue rows sum to 95.5-96.7% of body mass in every column (the report states 96%), regional blood flows sum to 100% of cardiac output and regional blood contents to 100%, skeletal parts add up to the total skeleton. Not every digit was compared with a page image."
+    notes: "Reference man (73 kg, 176 cm) and reference woman (60 kg, 163 cm), Caucasian, mainly European and North American data. Not the same population as ANSUR II, so organ and physiology data (ICRP) and body dimensions (ANSUR II) describe different people. Haematocrit is not in the report."
   ansur2:
     citation: "2012 Anthropometric Survey of U.S. Army Personnel (ANSUR II), public release: ANSUR_II_MALE_Public.csv (n=4082) and ANSUR_II_FEMALE_Public.csv (n=1986). U.S. Army Natick Soldier Research, Development and Engineering Center."
     url: null
@@ -19,17 +19,9 @@ sources:
   pmc8646028:
     citation: "Table T2 (fixed model parameters) of PMC8646028, a physiological liver model paper. Article title not recorded. Quotes ICRP 2002, de Simone 1997, Vander 2001 and Herman 2016."
     url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC8646028/table/T2"
-    primary: icrp89
     evidence: C
     verified_via: retrieved
-    notes: "Secondary compilation. Gives male haematocrit 0.45, height, mass and cardiac output."
-  pmc6343858:
-    citation: "PMC6343858. Article title not recorded. Quotes ICRP 89 section 7.4 (total blood volume) and section 7.7.2 (regional blood volumes)."
-    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC6343858/"
-    primary: icrp89
-    evidence: C
-    verified_via: retrieved
-    notes: "Gives the ICRP 89 total blood volume of 5300 cm^3 (male) and regional blood volume fractions."
+    notes: "Secondary compilation, cited here only for haematocrit (male 0.45, female 0.42; quoted from Vander 2001 and Herman 2016, not from ICRP, which gives no haematocrit)."
   glos_haem:
     citation: "Gloucestershire Hospitals NHS Foundation Trust, Haematology reference ranges (adult male: haemoglobin 130-180 g/L, haematocrit 0.40-0.54)."
     url: "https://www.gloshospitals.nhs.uk/our-services/services-we-offer/pathology/haematology/haematology-reference-ranges/"

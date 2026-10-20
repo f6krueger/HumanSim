@@ -66,7 +66,7 @@ def test_child_gets_growth_values_only(registry, mods):
     assert s.get("height") == pytest.approx(G.at("height", "female", 120).value)
     assert {"growth_curve", "interpolated"} <= s.flags["height"]
     # no adult value leaks into a child
-    for pid in ("liver_mass", "arm_span", "hematocrit", "resting_metabolic_rate", "hand_length"):
+    for pid in ("arm_span", "hematocrit", "hand_length", "neck_circumference"):
         assert s.get(pid) is None, pid
         assert "missing" in s.flags[pid]
     assert s.get("body_mass_index") == pytest.approx(s.get("body_mass") / (s.get("height") / 100) ** 2)
@@ -135,10 +135,41 @@ def test_solver_works_with_what_a_child_has(registry, mods):
     assert s.solver["converged"] and s.get("height") == 100.0
     base = resolve(registry, Context(age=3), mods)
     assert s.get("body_mass") > base.get("body_mass")  # taller child is heavier
-    assert s.get("liver_mass") is None
+    assert s.get("liver_mass") == pytest.approx(base.get("liver_mass"), rel=0.3)
     assert s.ranges is not None
 
 
 def test_unedited_child_is_a_solver_fixed_point(registry, mods):
     s = solve(registry, Context(sex="female", age=12), mods, load_couplings(registry))
     assert s.changed_from(resolve(registry, Context(sex="female", age=12), mods)) == {}
+
+
+# --- ICRP anchor ages -------------------------------------------------------------------------------------
+def test_icrp_anchor_age_is_exact_and_not_interpolated(registry, mods):
+    s = resolve(registry, Context(sex="female", age=10), mods)
+    assert s.get("liver_mass") == 0.83 and "interpolated" not in s.flags["liver_mass"]
+    assert s.get("cardiac_output") == 5.0
+    assert resolve(registry, Context(age=0), mods).get("liver_mass") == 0.13
+
+
+def test_between_anchors_is_linear_and_flagged(registry, mods):
+    s = resolve(registry, Context(age=7.5), mods)  # halfway between 5 y (0.57 kg) and 10 y (0.83 kg)
+    assert s.get("liver_mass") == pytest.approx(0.70)
+    assert "interpolated" in s.flags["liver_mass"]
+    assert "interpolated" in s.flags["hepatic_blood_flow"] or s.get("hepatic_blood_flow") is None
+    # 15 y male to adult: interpolated towards the adult value at age 20
+    m = resolve(registry, Context(age=17.5), mods)
+    assert m.get("liver_mass") == pytest.approx((1.3 + 1.8) / 2)
+
+
+def test_adult_only_values_do_not_reach_a_child(registry, mods):
+    s = resolve(registry, Context(age=10), mods)
+    assert s.get("hepatic_flow_fraction") is None  # adult-only in the report
+    assert s.get("hematocrit") is None
+
+
+def test_sex_specific_organs(registry, mods):
+    assert resolve(registry, Context(sex="female", age="adult"), mods).get("testes_mass") is None
+    assert resolve(registry, Context(sex="male", age="adult"), mods).get("ovaries_mass") is None
+    assert resolve(registry, Context(sex="male", age="adult"), mods).get("testes_mass") == 0.035
+    assert resolve(registry, Context(sex="female", age=15), mods).get("uterus_mass") == 0.03

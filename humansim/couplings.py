@@ -71,9 +71,10 @@ class SolveCtx:
     """What a coupling function sees: current and reference values, and the deadband rule."""
 
     def __init__(self, registry: Registry, sex: str, cur: dict, ref: dict, pinned: set[str],
-                 coupling: Coupling):
+                 coupling: Coupling, ranges: dict | None = None):
         self.registry, self.sex, self._cur, self._ref = registry, sex, cur, ref
         self.pinned, self.coupling = pinned, coupling
+        self.ranges = ranges  # pediatric: age-specific 3rd-97th percentile ranges replace the adult ones
 
     def cur(self, pid: str):
         return self._cur.get(pid)
@@ -97,7 +98,10 @@ class SolveCtx:
     def band(self, pid: str | None) -> tuple[float, float]:
         d = self.coupling.deadband
         if d == "ref_range":
-            rng = self.registry[pid].ref_range.get(self.sex) if pid else None
+            if self.ranges is not None:
+                rng = self.ranges.get(pid) if pid else None
+            else:
+                rng = self.registry[pid].ref_range.get(self.sex) if pid else None
             base = self.ref(pid) if pid else None
             if not rng or not base:
                 return (1.0, 1.0)  # range undefined: no deadband, never a guess at one

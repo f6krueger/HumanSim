@@ -82,7 +82,7 @@ def test_set_rule_cannot_be_inverted_for_male():
 
 def test_every_sex_rule_targets_a_valid_parameter_once(registry, mods):
     assert modifier_checks(registry, mods)[0].status == "pass"
-    assert len(mods) == 54
+    assert len(mods) > 150  # one rule per stored male/female pair, plus assumed-neutral ones
     assert {m.stage for m in mods} == {"sex"}
     assert all(m.when == {"sex": "female"} for m in mods)
 

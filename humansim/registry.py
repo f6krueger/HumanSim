@@ -53,6 +53,25 @@ class Parameter:
         """Mean value for (sex, age), or None if the data has no entry for it."""
         return self.values.get(sex, {}).get(age)
 
+    def at_age(self, sex: str, years: float) -> tuple[float, bool] | None:
+        """Value at a numeric age (below 20 years) from the stored anchor ages.
+
+        Returns (value, interpolated). An exact anchor is not interpolated. Between two anchors the
+        value is linear in age and flagged interpolated; the "adult" entry counts as age 20. Outside
+        the anchored span, or when a neighbouring anchor is missing, there is no value."""
+        by_age = self.values.get(sex, {})
+        pts = sorted((20.0 if a == "adult" else float(a), v) for a, v in by_age.items()
+                     if a == "adult" or (isinstance(a, (int, float)) and not isinstance(a, bool)))
+        for a, v in pts:
+            if a == years:
+                return v, False
+        lo = [(a, v) for a, v in pts if a < years]
+        hi = [(a, v) for a, v in pts if a > years]
+        if not lo or not hi:
+            return None
+        (a0, v0), (a1, v1) = lo[-1], hi[0]
+        return v0 + (v1 - v0) * (years - a0) / (a1 - a0), True
+
     def spread(self, sex: str, age: object) -> float | None:
         """Standard deviation for (sex, age) if the data has one."""
         return self.sd.get(sex, {}).get(age)

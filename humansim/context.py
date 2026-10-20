@@ -124,8 +124,9 @@ def resolve(registry: Registry, context: Context, modifiers: Iterable[Modifier] 
                 notes.append(f"Age {context.age} is treated as the adult baseline: ageing after 20 is not modelled.")
         else:
             months = float(age_key) * 12.0
-            notes.append("Pediatric age: values come from CDC 2000 growth curves only. Parameters without a "
-                         "growth curve have no value; adult values are never used for a child.")
+            notes.append("Pediatric age: height, mass and head size come from CDC 2000 growth curves; other values "
+                         "come from ICRP 89 anchor ages (birth, 1, 5, 10, 15 y), linear between anchors and flagged "
+                         "interpolated. Parameters with neither have no value; adult values are never used for a child.")
     growth = load_growth() if months is not None else None
     ranges: dict | None = {} if months is not None else None
 
@@ -141,8 +142,13 @@ def resolve(registry: Registry, context: Context, modifiers: Iterable[Modifier] 
             if pt is not None:
                 v, f_growth = pt.value, True
                 ranges[p.id] = (pt.low, pt.high)
+        f_interp = False
+        if v is None and months is not None and not f_growth:
+            hit = p.at_age(context.sex, months / 12.0)
+            if hit is not None:
+                v, f_interp = hit
         f: set[str] = set()
-        if v is None:
+        if v is None and months is None:
             # No stored value for this sex: start from the other sex's value and let a sex rule
             # convert it (forward for female, inverted for male). Stored values always win.
             other = "male" if context.sex == "female" else "female"
@@ -157,6 +163,10 @@ def resolve(registry: Registry, context: Context, modifiers: Iterable[Modifier] 
                 f.add("no_data_for_context")
         elif f_growth:
             f |= {"growth_curve", "interpolated"}
+        elif f_interp:
+            f.add("interpolated")
+            if p.status in ("unsourced", "placeholder"):
+                f.add(p.status)
         elif p.status in ("unsourced", "placeholder"):
             f.add(p.status)
         flags[p.id] = f

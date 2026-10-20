@@ -13,7 +13,8 @@ def test_baseline_male(registry):
     assert 170 < h < 182 and 75 < m < 95
     assert s.get("body_mass_index") == pytest.approx(m / (h / 100) ** 2)
     assert "missing" in s.flags["femur_length"]
-    assert "unsourced" in s.flags["liver_mass"]
+    assert "unsourced" not in s.flags["liver_mass"]  # ICRP 89 Table 2.8, referenced
+    assert registry["liver_mass"].status == "referenced" and registry["liver_mass"].source_ref == "icrp89"
     assert "missing" in s.flags["intermembral_index"]
     assert s.missing_inputs["intermembral_index"] == ["femur_length", "tibia_length"]
     assert s.get("ape_index") == pytest.approx(s.get("arm_span") / h)

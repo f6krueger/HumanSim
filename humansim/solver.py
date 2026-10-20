@@ -52,7 +52,7 @@ def solve(registry: Registry, context: Context, modifiers: Iterable[Modifier],
             if base is None:
                 skipped[c.id] = "no reference value for the target"
                 continue
-            ctx = SolveCtx(registry, context.sex, values, ref.values, pinned, c)
+            ctx = SolveCtx(registry, context.sex, values, ref.values, pinned, c, state.ranges)
             try:
                 out = FUNCTIONS[c.fn](ctx, c.args)
             except (OverflowError, ZeroDivisionError):

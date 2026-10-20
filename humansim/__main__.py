@@ -127,7 +127,7 @@ def main(argv: list[str] | None = None) -> int:
     sources = load_sources()
     couplings = load_couplings(reg)
     cited = ({m.source_ref for m in modifiers} | {c.source_ref for c in couplings}
-             | {load_validation("nchs_sex_ratios")["source_ref"]}
+             | {load_validation("nchs_sex_ratios")["source_ref"], "mifflin1990"}
              | {c['source_ref'] for c in load_growth()._curves.values()}) - {None}
     results = (state_checks(state) + dataset_checks(reg, sources, cited)
                + modifier_checks(reg, modifiers, sources)

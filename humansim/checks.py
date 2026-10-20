@@ -11,15 +11,24 @@ from dataclasses import dataclass, field
 from .context import State
 from .registry import Registry
 
-BLOOD_DENSITY_KG_PER_L = 1.06  # approximate
-MAX_UNASSIGNED_FRACTION = 0.10  # above this, the tissue budget warns
-
-# Tissues whose masses are expected to add up to (most of) body mass.
-TISSUE_MASSES = (
-    "skeletal_muscle_mass", "skeleton_mass", "adipose_tissue_mass", "skin_mass",
-    "liver_mass", "brain_mass", "heart_mass", "kidneys_mass", "lungs_mass",
-    "spleen_mass", "pancreas_mass", "thyroid_mass",
+# ICRP 89 Table 2.8: the rows that make up the whole-body sum (rows the report marks as duplicating
+# others are left out). The report says they represent 96% of total body mass.
+WHOLE_BODY_ROWS = (
+    "separable_adipose_mass", "adrenals_mass", "tongue_mass", "salivary_glands_mass", "oesophagus_wall_mass",
+    "stomach_wall_mass", "stomach_contents_mass", "small_intestine_wall_mass", "small_intestine_contents_mass",
+    "right_colon_wall_mass", "right_colon_contents_mass", "left_colon_wall_mass", "left_colon_contents_mass",
+    "rectosigmoid_wall_mass", "rectosigmoid_contents_mass", "liver_mass", "gallbladder_wall_mass",
+    "gallbladder_contents_mass", "pancreas_mass", "brain_mass", "breasts_mass", "heart_mass", "blood_mass",
+    "eyes_mass", "skin_mass", "skeletal_muscle_mass", "pituitary_mass", "larynx_mass", "trachea_mass",
+    "lungs_mass", "cortical_bone_mass", "trabecular_bone_mass", "active_marrow_mass", "inactive_marrow_mass",
+    "cartilage_mass", "teeth_mass", "skeleton_miscellaneous_mass", "spleen_mass", "thymus_mass", "thyroid_mass",
+    "tonsils_mass", "kidneys_mass", "ureters_mass", "urinary_bladder_mass", "urethra_mass", "testes_mass",
+    "epididymes_mass", "prostate_mass", "ovaries_mass", "fallopian_tubes_mass", "uterus_mass",
 )
+SEX_ORGANS = {"testes_mass", "epididymes_mass", "prostate_mass", "ovaries_mass", "fallopian_tubes_mass", "uterus_mass",
+              "breasts_mass"}
+ICRP_COVERAGE = 0.96  # footnote c of Table 2.8
+COVERAGE_TOLERANCE = 0.03
 
 
 @dataclass
@@ -30,38 +39,48 @@ class CheckResult:
     details: dict = field(default_factory=dict)
 
 
+def organ_reference_mass(state: State) -> tuple[float | None, str]:
+    """The mass the organ data should add up to. The ICRP organ masses describe the ICRP reference person
+    (73 kg man, 60 kg woman), not the ANSUR II body, so an unedited state is compared with the reference
+    mass. Once something is edited or solved, body_mass (which includes the change) is used."""
+    ref = state.get("reference_body_mass") if "reference_body_mass" in state.values else None
+    if ref is not None and not state.context.edits and state.solver is None:
+        return ref, "reference_body_mass"
+    return state.get("body_mass"), "body_mass"
+
+
 def tissue_mass_budget(state: State) -> CheckResult:
-    mass = state.get("body_mass")
+    mass, basis = organ_reference_mass(state)
     if mass is None:
-        return CheckResult("tissue_mass_budget", "skipped", "body_mass has no value")
-    missing = [i for i in TISSUE_MASSES if state.get(i) is None]
-    total = sum(state.get(i) or 0.0 for i in TISSUE_MASSES)
-    blood = state.get("blood_volume")
-    if blood is not None:
-        total += blood * BLOOD_DENSITY_KG_PER_L
-    else:
-        missing.append("blood_volume")
-    remainder = mass - total
-    details = {"listed_total_kg": round(total, 3), "unassigned_kg": round(remainder, 3),
-               "missing": missing}
+        return CheckResult("tissue_mass_budget", "skipped", "no body mass for this context")
+    sex_ok = [i for i in WHOLE_BODY_ROWS if i in state.values]
+    missing, total = [], 0.0
+    for i in sex_ok:
+        v = state.get(i)
+        if v is None:
+            if i in SEX_ORGANS:
+                continue  # not every sex or age has these organs
+            missing.append(i)
+        else:
+            total += v
+    details = {"listed_total_kg": round(total, 3), "basis": basis, "basis_mass_kg": round(mass, 3),
+               "unassigned_kg": round(mass - total, 3), "missing": missing}
     if total > mass:
         return CheckResult("tissue_mass_budget", "fail",
-                           f"Listed tissues sum to {total:.2f} kg, more than body mass {mass:.2f} kg.",
-                           details)
+                           f"Listed tissues sum to {total:.2f} kg, more than {basis} {mass:.2f} kg.", details)
     if missing:
         return CheckResult("tissue_mass_budget", "warn",
-                           f"Partial budget: {len(missing)} tissue(s) have no value; "
-                           f"{remainder:.2f} kg unassigned.", details)
-    if remainder / mass > MAX_UNASSIGNED_FRACTION:
+                           f"Partial budget: {len(missing)} tissue(s) have no value ({', '.join(missing[:4])}"
+                           f"{'...' if len(missing) > 4 else ''}); {mass - total:.2f} kg of {basis} unassigned.", details)
+    frac = total / mass
+    if abs(frac - ICRP_COVERAGE) > COVERAGE_TOLERANCE:
         return CheckResult("tissue_mass_budget", "warn",
-                           f"{remainder:.1f} kg ({remainder / mass:.0%}) of body mass is not covered by "
-                           f"the listed tissues. Most likely the organ and tissue masses (ICRP reference "
-                           f"man, 73 kg) and body mass ({mass:.1f} kg) come from different populations; "
-                           f"it does not mean anatomy is missing.", details)
+                           f"Listed tissues are {frac:.1%} of {basis} ({mass:.1f} kg). The ICRP 89 reference "
+                           f"values cover 96%; the rest is connective and lymphatic tissue the report does not list.",
+                           details)
     return CheckResult("tissue_mass_budget", "pass",
-                       f"Listed tissues sum to {total:.2f} kg; {remainder:.2f} kg unassigned "
-                       f"(gut contents, bone marrow detail, double-counted blood in organs, etc.).",
-                       details)
+                       f"Listed tissues are {frac:.1%} of {basis} ({mass:.1f} kg); ICRP 89 reports 96%, with the rest "
+                       f"separable connective and lymphatic tissue.", details)
 
 
 def segment_stature_sum(state: State, warn: float = 0.05, fail: float = 0.10) -> CheckResult:
@@ -99,7 +118,7 @@ def range_flags(state: State) -> CheckResult:
 def sex_rule_coverage(state: State) -> CheckResult:
     """Parameters whose value exists only for the other sex and have no sex rule to convert it."""
     other = "male" if state.context.sex == "female" else "female"
-    no_rule = sorted(i for i, f in state.flags.items() if "no_sex_rule" in f)
+    no_rule = sorted(i for i, f in state.flags.items() if "no_sex_rule" in f and i not in SEX_ORGANS)
     if no_rule:
         shown = ", ".join(no_rule[:8]) + (f", and {len(no_rule) - 8} more" if len(no_rule) > 8 else "")
         return CheckResult(
@@ -117,18 +136,53 @@ RMR_RESIDUAL_RATE = 12.0  # kcal/kg/day (Wang 2010, secondary source)
 
 
 def rmr_organ_crosscheck(state: State, warn: float = 0.15) -> CheckResult:
-    """Independent cross-check: the organ-sum metabolic rate against the stored (equation-based) one."""
-    need = list(RMR_RATES) + ["body_mass", "resting_metabolic_rate"]
-    if any(state.get(i) is None for i in need):
+    """Independent cross-check: the organ-sum metabolic rate (Wang 2010 tissue rates) against the ICRP
+    basal metabolic rate. Two different sources, so agreement is a real check."""
+    if state.ranges is not None:
+        return CheckResult("rmr_organ_crosscheck", "skipped",
+                           "the tissue rates (Wang 2010) are adult values; children's organs burn more per kg")
+    mass, basis = organ_reference_mass(state)
+    need = list(RMR_RATES) + ["resting_metabolic_rate"]
+    if mass is None or any(state.get(i) is None for i in need):
         return CheckResult("rmr_organ_crosscheck", "skipped", "organ masses or metabolic rate missing")
-    residual = max(state.get("body_mass") - sum(state.get(i) for i in RMR_RATES), 0.0)
+    residual = max(mass - sum(state.get(i) for i in RMR_RATES), 0.0)
     total = sum(RMR_RATES[i] * state.get(i) for i in RMR_RATES) + RMR_RESIDUAL_RATE * residual
     stored = state.get("resting_metabolic_rate")
     diff = total / stored - 1.0
-    details = {"organ_sum_kcal_day": round(total), "stored_kcal_day": round(stored), "difference": round(diff, 3)}
-    msg = (f"Organ-sum metabolic rate {total:.0f} kcal/day vs stored {stored:.0f} ({diff:+.1%}). "
-           f"The two come from different sources, so agreement is a real check.")
+    details = {"organ_sum_kcal_day": round(total), "stored_kcal_day": round(stored), "difference": round(diff, 3),
+               "basis": basis}
+    msg = (f"Organ-sum metabolic rate {total:.0f} kcal/day vs ICRP basal rate {stored:.0f} ({diff:+.1%}), "
+           f"residual mass from {basis}.")
     return CheckResult("rmr_organ_crosscheck", "warn" if abs(diff) > warn else "pass", msg, details)
+
+
+def mifflin_crosscheck(state: State, warn: float = 0.10) -> CheckResult:
+    """ICRP basal metabolic rate against the Mifflin-St Jeor equation at the ICRP reference height and mass."""
+    ctx = state.context
+    if ctx.age != "adult" and not (isinstance(ctx.age, (int, float)) and ctx.age >= 20):
+        return CheckResult("mifflin_crosscheck", "skipped", "equation is for adults")
+    h, m, bmr = state.get("reference_height"), state.get("reference_body_mass"), state.get("resting_metabolic_rate")
+    if None in (h, m, bmr) or state.context.edits:
+        return CheckResult("mifflin_crosscheck", "skipped", "reference height, mass or metabolic rate missing, or edited")
+    pred = 10 * m + 6.25 * h - 5 * 30 + (5 if ctx.sex == "male" else -161)
+    diff = bmr / pred - 1.0
+    return CheckResult("mifflin_crosscheck", "warn" if abs(diff) > warn else "pass",
+                       f"ICRP basal rate {bmr:.0f} kcal/day vs Mifflin-St Jeor {pred:.0f} at the reference person, "
+                       f"age 30 ({diff:+.1%}).", {"icrp": round(bmr), "mifflin": round(pred)})
+
+
+def icrp_red_cell_crosscheck(state: State, warn: float = 0.10) -> CheckResult:
+    """Red cell volume from blood volume x haematocrit against ICRP 89 Table 2.12 (2.3 L male, 1.5 L female).
+    The haematocrit comes from a different source than the blood volume, so this is a real check."""
+    ref = {"male": 2.3, "female": 1.5}[state.context.sex]
+    adult = state.ranges is None
+    v = state.get("red_cell_volume")
+    if not adult or v is None or state.context.edits:
+        return CheckResult("icrp_red_cell_crosscheck", "skipped", "adult, unedited context with red cell volume needed")
+    diff = v / ref - 1.0
+    return CheckResult("icrp_red_cell_crosscheck", "warn" if abs(diff) > warn else "pass",
+                       f"Red cell volume {v:.2f} L (blood volume x haematocrit) vs ICRP 89 Table 2.12 {ref} L ({diff:+.1%}).",
+                       {"model": round(v, 3), "icrp": ref})
 
 
 def solver_converged(state: State) -> CheckResult:
@@ -203,7 +257,7 @@ def bmi_consistency(state: State, tol: float = 0.08) -> CheckResult:
 
 def state_checks(state: State) -> list[CheckResult]:
     return [tissue_mass_budget(state), segment_stature_sum(state), range_flags(state),
-            sex_rule_coverage(state), rmr_organ_crosscheck(state), solver_converged(state),
+            sex_rule_coverage(state), rmr_organ_crosscheck(state), mifflin_crosscheck(state), icrp_red_cell_crosscheck(state), solver_converged(state),
             bmi_consistency(state)]
 
 
