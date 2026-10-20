@@ -5,9 +5,10 @@ from __future__ import annotations
 import argparse
 import sys
 
-from .checks import coupling_checks, dataset_checks, modifier_checks, state_checks
+from .checks import coupling_checks, growth_continuity, dataset_checks, modifier_checks, state_checks
 from .context import Context, resolve
 from .couplings import load_couplings
+from .growth import load_growth
 from .modifiers import load_modifiers
 from .registry import Registry
 from .solver import solve
@@ -37,7 +38,7 @@ def _context(args, reg: Registry) -> Context:
         age = int(age) if age.is_integer() else age
     except ValueError:
         pass
-    return Context(sex=args.sex, age=age, edits=_parse_edits(reg, args.set),
+    return Context(sex=args.sex, age=age, growth_z=getattr(args, 'z', 0.0), edits=_parse_edits(reg, args.set),
                    keep_unadjusted=getattr(args, 'keep_unadjusted', False))
 
 
@@ -55,7 +56,9 @@ def main(argv: list[str] | None = None) -> int:
 
     def add_context_args(p):
         p.add_argument("--sex", default="male", choices=["male", "female"])
-        p.add_argument("--age", default="adult")
+        p.add_argument("--age", default="adult", help="'adult' or years (below 20: CDC growth curves)")
+        p.add_argument("--z", type=float, default=0.0,
+                       help="pediatric ages only: growth-curve z-score (0 = median; 1 = about the 84th percentile)")
         p.add_argument("--set", action="append", metavar="ID=VALUE",
                        help="override a parameter, e.g. body_mass=90 or body_mass='198 lb'")
         p.add_argument("--solve", action="store_true",
@@ -106,6 +109,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "show":
         print(format_state(state, group=args.group, only_changed=args.changed,
                            hide_missing=not args.all))
+        for note in state.notes:
+            print(f"\nNote: {note}")
         if state.solver:
             sv = state.solver
             print(f"\nSolver: {'converged' if sv['converged'] else 'DID NOT CONVERGE'} in {sv['iterations']} "
@@ -122,10 +127,12 @@ def main(argv: list[str] | None = None) -> int:
     sources = load_sources()
     couplings = load_couplings(reg)
     cited = ({m.source_ref for m in modifiers} | {c.source_ref for c in couplings}
-             | {load_validation("nchs_sex_ratios")["source_ref"]}) - {None}
+             | {load_validation("nchs_sex_ratios")["source_ref"]}
+             | {c['source_ref'] for c in load_growth()._curves.values()}) - {None}
     results = (state_checks(state) + dataset_checks(reg, sources, cited)
                + modifier_checks(reg, modifiers, sources)
-               + coupling_checks(reg, couplings, sources))
+               + coupling_checks(reg, couplings, sources)
+               + growth_continuity(reg, state.context.sex))
     return _print_checks(results)
 
 

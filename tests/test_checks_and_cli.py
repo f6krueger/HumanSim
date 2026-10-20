@@ -48,7 +48,7 @@ def test_range_flags_check(registry):
 
 
 def test_state_checks_run(registry):
-    assert len(state_checks(resolve(registry, Context()))) == 6
+    assert len(state_checks(resolve(registry, Context()))) == 7
 
 
 def _cli(*args):

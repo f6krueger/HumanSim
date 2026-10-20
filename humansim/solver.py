@@ -28,7 +28,7 @@ from .registry import Registry
 def solve(registry: Registry, context: Context, modifiers: Iterable[Modifier],
           couplings: Iterable[Coupling], tol: float = 1e-9, max_iter: int = 200) -> State:
     modifiers, couplings = list(modifiers), list(couplings)
-    ref = resolve(registry, Context(sex=context.sex, age=context.age, hormone_state=context.hormone_state,
+    ref = resolve(registry, Context(sex=context.sex, age=context.age, hormone_state=context.hormone_state, growth_z=context.growth_z,
                                     genotype=context.genotype, drugs=context.drugs,
                                     keep_unadjusted=context.keep_unadjusted), modifiers)
     state = resolve(registry, context, modifiers)
@@ -93,8 +93,8 @@ def solve(registry: Registry, context: Context, modifiers: Iterable[Modifier],
             note += f"; OUTSIDE validity {c.validity[0]}-{c.validity[1]}: extrapolation"
         trace.append(TraceEntry(c.target, "solve", c.id, before, after, note))
 
-    flag_ranges(registry, context.sex, values, flags)
+    flag_ranges(registry, context.sex, values, flags, state.ranges)
     missing_inputs = finalize_derived(values, flags)
-    return State(context, registry, values, flags, trace, missing_inputs,
+    return State(context, registry, values, flags, trace, missing_inputs, ranges=state.ranges, notes=state.notes,
                  solver={"iterations": iterations, "converged": converged, "skipped": skipped,
                          "couplings": len(couplings)})

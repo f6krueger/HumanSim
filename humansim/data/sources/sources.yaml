@@ -60,3 +60,9 @@ sources:
     evidence: B
     verified_via: "values (liver 200, brain 240, heart 440, kidneys 440, skeletal muscle 13, adipose tissue 4.5 kcal/kg/day; residual 12) read on a secondary page (BioNumbers); original article not read"
     notes: "The residual rate of 12 kcal/kg/day is my reading of the secondary page for 'other tissues' and should be checked against the article."
+  cdc2000:
+    citation: "Kuczmarski RJ, Ogden CL, Guo SS, et al. 2000 CDC Growth Charts for the United States: methods and development. Vital Health Stat 11(246), 2002. LMS parameter tables for stature/length, weight, head circumference and BMI for age, birth to 20 years."
+    url: "https://www.cdc.gov/growthcharts/cdc-data-files.htm"
+    evidence: A
+    verified_via: "CDC and WHO sites were not reachable from the workspace. The tables were taken from the MIT-licensed PyPI package growthcharts 0.2.1 (a third-party copy of the CDC data) and spot-checked: male birth length 49.99 cm and weight 3.53 kg, female age-20 median stature 163.34 cm and weight 58.2 kg match the published CDC values I know. Not compared row by row with the CDC files."
+    notes: "US children measured mainly 1963-1994, so not a current or non-US reference. CDC itself recommends the WHO standards below age 2; the CDC infant tables are used here because WHO tables were not retrievable. Data are a US government work. Medians are used as 'the average child'."

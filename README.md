@@ -4,9 +4,9 @@ A Python library that models the human body as a network of interconnected anato
 physiological parameters, for population averages (not individuals). You set a context, edit any
 value, and see what changes. See `docs/SPEC.md` for the full design.
 
-**Status: Phase 3.** The core, derived layer, consistency checks, modifier machinery, adult male and
-female baselines (both stored, either derivable from the other) and a steady-state solver exist.
-Development, hormones, pharmacology and genetics are specified but not built yet. Run `python -m humansim coverage` to see exactly how much data there is.
+**Status: Phase 4.** The core, derived layer, consistency checks, modifier machinery, adult male and
+female baselines (both stored, either derivable from the other), a steady-state solver and an age
+axis for birth to 20 years exist. Hormones, pharmacology and genetics are specified but not built yet. Run `python -m humansim coverage` to see exactly how much data there is.
 
 ## Install and run
 
@@ -28,6 +28,10 @@ python -m humansim validate                              # rule/pair consistency
 python -m humansim show --set liver_mass=9 --solve --changed --trace   # the ripple, step by step
 python -m humansim show --set height="7 ft" --solve --changed
 python -m humansim check --solve --set liver_mass=9
+
+python -m humansim show --age 10 --sex female            # a 10-year-old girl (CDC growth curves)
+python -m humansim show --age 0.5 --z 1                  # 6 months, one SD above the median
+python -m humansim show --age 3 --solve --set height=100
 ```
 
 ```python
@@ -137,6 +141,32 @@ Organ and tissue exponents (0.75, 1.0), the 10% deadbands, the validity ranges a
 exponents are modelling assumptions, not fitted or sourced. Which tissue takes up a body-mass change
 (fat or muscle) depends on cause and is not modelled.
 
+## Development (Phase 4)
+
+`Context(age=...)` takes `"adult"` or years. Below 20 years the model uses the **CDC 2000 growth
+curves** (LMS tables in `data/growth/`): height, body mass and (to 36 months) head circumference, by
+sex, interpolated in months and flagged `growth_curve` and `interpolated`. `growth_z` picks a
+percentile (0 is the median, "the average child"). Reference ranges at a pediatric age are the 3rd to
+97th percentile at that age, replacing the adult ranges.
+
+Rules that keep pediatric and adult data apart:
+- A parameter with no growth curve **has no value** for a child (flagged `missing`); adult values are never used.
+- Age 20 and over is the adult baseline, with a note that ageing after 20 is not modelled.
+- The solver runs at any age with what exists. In a child only height, mass and head size move.
+
+Checks: the LMS formula reproduces the published P3/P50/P97 from L, M, S in every table; BMI computed
+from median height and weight agrees with the CDC median BMI within 8%; `check` reports the gap
+between the CDC median at 20 years and the adult baseline. That gap is large for body mass
+(men -17.5%, women -14%) because ANSUR II is a heavier military sample, and it is not hidden.
+
+**Limits.** Only three parameters have curves. No organ, blood or metabolic data exist for children:
+the ICRP 89 age tables (newborn, 1, 5, 10, 15 years) could not be retrieved, so they are absent
+rather than guessed. The CDC and WHO sites were unreachable; the tables came from a third-party
+PyPI copy and were spot-checked, not compared row by row (see `cdc2000` in the sources). The CDC
+data are US children measured mainly 1963-1994, and CDC itself prefers WHO standards under 2 years.
+Puberty timing, ageing after 20 and the infant length/stature switch at 24 months (a jump under
+1.5 cm) are not modelled. Attach the ICRP 89 age tables, or WHO LMS tables, to extend this.
+
 ## Layout
 
 ```
@@ -151,6 +181,8 @@ humansim/
   couplings.py       coupling records, deadband and the coupling functions
   solver.py          steady-state solve()
   data/couplings/    the Phase 3 couplings (steady_state.yaml)
+  growth.py          CDC growth-curve (LMS) lookup for the age axis
+  data/growth/       CDC 2000 LMS tables and curves.yaml
   modifiers.py       the modifier mechanism
   validation.py      validation-file loader
   checks.py          consistency and dataset checks

@@ -16,11 +16,12 @@ from dataclasses import dataclass, field
 from typing import Iterable
 
 from . import derived as _derived
+from .growth import ADULT_AGE_YEARS, load_growth
 from .modifiers import STAGES, Modifier
 from .registry import Registry
 
 # Flags a derived value inherits from its inputs.
-_INHERITED = {"unsourced", "placeholder", "edited", "modified"}
+_INHERITED = {"unsourced", "placeholder", "edited", "modified", "interpolated"}
 
 
 @dataclass
@@ -30,6 +31,8 @@ class Context:
     hormone_state: dict[str, float] = field(default_factory=dict)
     genotype: dict[str, str] = field(default_factory=dict)
     drugs: dict[str, float] = field(default_factory=dict)
+    # Pediatric ages only: the growth-curve z-score (0 = median, the "average child").
+    growth_z: float = 0.0
     edits: dict[str, float] = field(default_factory=dict)  # parameter id -> value in registry unit
     # Keep values taken from the other sex that have no sex rule (flagged "no_sex_rule") instead of
     # leaving them empty. Off by default because they are not valid for this sex.
@@ -55,6 +58,8 @@ class State:
     trace: list[TraceEntry]
     missing_inputs: dict[str, list[str]]
     solver: dict | None = None  # filled by solver.solve(): iterations, converged, skipped couplings
+    ranges: dict | None = None  # pediatric only: per-parameter (low, high) 3rd-97th percentile at this age
+    notes: list = field(default_factory=list)
 
     def get(self, pid: str) -> float | None:
         return self.values[pid]
@@ -70,15 +75,17 @@ class State:
         return out
 
 
-def flag_ranges(registry: Registry, sex: str, values: dict, flags: dict) -> None:
-    """Flag stored values outside their per-sex reference range or their viability limit."""
+def flag_ranges(registry: Registry, sex: str, values: dict, flags: dict, ranges: dict | None = None) -> None:
+    """Flag stored values outside their reference range or their viability limit.
+    `ranges` is given only at pediatric ages: then only those age-specific ranges apply, because the
+    registry's ranges are adult ranges."""
     for p in registry:
         v = values.get(p.id)
         if p.kind == "derived" or v is None:
             continue
         flags[p.id].discard("outside_reference_range")
         flags[p.id].discard("beyond_viability_limit")
-        rng = p.ref_range.get(sex)  # ranges are per sex; no range for a sex means no flag
+        rng = ranges.get(p.id) if ranges is not None else p.ref_range.get(sex)  # no range means no flag
         if rng and not (rng[0] <= v <= rng[1]):
             flags[p.id].add("outside_reference_range")
         if p.viability_limit and not (p.viability_limit[0] <= v <= p.viability_limit[1]):
@@ -107,18 +114,39 @@ def resolve(registry: Registry, context: Context, modifiers: Iterable[Modifier] 
     if context.sex not in ("male", "female"):
         raise ValueError(f"sex must be 'male' or 'female', got {context.sex!r}")
 
+    age_key, months, notes = context.age, None, []
+    if isinstance(age_key, (int, float)) and not isinstance(age_key, bool):
+        if not math.isfinite(age_key) or age_key < 0:
+            raise ValueError(f"age must be a non-negative number of years, got {context.age!r}")
+        if age_key >= ADULT_AGE_YEARS:
+            age_key = "adult"
+            if context.age != ADULT_AGE_YEARS:
+                notes.append(f"Age {context.age} is treated as the adult baseline: ageing after 20 is not modelled.")
+        else:
+            months = float(age_key) * 12.0
+            notes.append("Pediatric age: values come from CDC 2000 growth curves only. Parameters without a "
+                         "growth curve have no value; adult values are never used for a child.")
+    growth = load_growth() if months is not None else None
+    ranges: dict | None = {} if months is not None else None
+
     values: dict[str, float | None] = {}
     flags: dict[str, set[str]] = {}
     for p in registry:
         if p.kind == "derived":
             continue
-        v = p.baseline(context.sex, context.age)
+        v = p.baseline(context.sex, age_key)
+        f_growth = False
+        if v is None and growth is not None:
+            pt = growth.at(p.id, context.sex, months, context.growth_z)
+            if pt is not None:
+                v, f_growth = pt.value, True
+                ranges[p.id] = (pt.low, pt.high)
         f: set[str] = set()
         if v is None:
             # No stored value for this sex: start from the other sex's value and let a sex rule
             # convert it (forward for female, inverted for male). Stored values always win.
             other = "male" if context.sex == "female" else "female"
-            ov = p.baseline(other, context.age)
+            ov = p.baseline(other, age_key)
             if ov is not None:
                 v = ov
                 f |= {f"derived_from_{other}", "no_sex_rule"}
@@ -127,6 +155,8 @@ def resolve(registry: Registry, context: Context, modifiers: Iterable[Modifier] 
             f.add("missing")
             if p.values:
                 f.add("no_data_for_context")
+        elif f_growth:
+            f |= {"growth_curve", "interpolated"}
         elif p.status in ("unsourced", "placeholder"):
             f.add(p.status)
         flags[p.id] = f
@@ -196,7 +226,7 @@ def resolve(registry: Registry, context: Context, modifiers: Iterable[Modifier] 
         flags[pid] = {"edited"}
         trace.append(TraceEntry(pid, "edit", "user", before, x))
 
-    flag_ranges(registry, context.sex, values, flags)
+    flag_ranges(registry, context.sex, values, flags, ranges)
     missing_inputs = finalize_derived(values, flags)
 
-    return State(context, registry, values, flags, trace, missing_inputs)
+    return State(context, registry, values, flags, trace, missing_inputs, ranges=ranges, notes=notes)

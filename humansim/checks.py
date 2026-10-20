@@ -164,9 +164,47 @@ def coupling_checks(registry: Registry, couplings, sources: dict[str, dict] | No
                         {"problems": problems})]
 
 
+def growth_continuity(registry: Registry, sex: str = "male") -> list[CheckResult]:
+    """Compare the last CDC growth value (just under 20 years) with the adult baseline. A large gap is
+    expected where the adult data are a different population (ANSUR II is a military sample)."""
+    from .growth import load_growth
+    growth = load_growth()
+    out = []
+    for pid in growth.parameters:
+        pt = growth.at(pid, sex, 239.9)
+        adult = registry[pid].baseline(sex, "adult") if pid in registry else None
+        if pt is None or adult is None:
+            continue
+        diff = pt.value / adult - 1.0
+        out.append(CheckResult(
+            f"growth_continuity:{pid}:{sex}", "warn" if abs(diff) > 0.05 else "pass",
+            f"CDC median at 20 y {pt.value:.1f} vs adult baseline {adult:.1f} ({diff:+.1%}). "
+            f"Different populations: CDC is the general US public, ANSUR II is US Army personnel.",
+            {"cdc": round(pt.value, 2), "adult": adult, "difference": round(diff, 3)}))
+    return out
+
+
+def bmi_consistency(state: State, tol: float = 0.08) -> CheckResult:
+    """At a pediatric age the BMI computed from median height and weight should be close to the CDC
+    median BMI (not identical: the median of a ratio is not the ratio of medians)."""
+    from .growth import load_growth
+    ctx = state.context
+    if state.ranges is None or ctx.edits:
+        return CheckResult("bmi_consistency", "skipped", "not an unedited pediatric context")
+    ref = load_growth().check_point("body_mass_index", ctx.sex, float(ctx.age) * 12)
+    mine = state.get("body_mass_index")
+    if ref is None or mine is None:
+        return CheckResult("bmi_consistency", "skipped", "no CDC BMI median at this age")
+    diff = mine / ref - 1.0
+    return CheckResult("bmi_consistency", "warn" if abs(diff) > tol else "pass",
+                       f"BMI from median height and weight {mine:.2f} vs CDC median BMI {ref:.2f} ({diff:+.1%}).",
+                       {"derived": round(mine, 2), "cdc": round(ref, 2)})
+
+
 def state_checks(state: State) -> list[CheckResult]:
     return [tissue_mass_budget(state), segment_stature_sum(state), range_flags(state),
-            sex_rule_coverage(state), rmr_organ_crosscheck(state), solver_converged(state)]
+            sex_rule_coverage(state), rmr_organ_crosscheck(state), solver_converged(state),
+            bmi_consistency(state)]
 
 
 def modifier_checks(registry: Registry, modifiers, sources: dict[str, dict] | None = None) -> list[CheckResult]:

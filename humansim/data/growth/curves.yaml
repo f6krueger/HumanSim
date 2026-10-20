@@ -1,0 +1,22 @@
+# Which growth tables drive which parameter, and over which age span (months).
+# Tables are the CDC 2000 growth charts in LMS form (Sex 1=male 2=female; Agemos; L, M, S).
+# Infant tables are used below 24 months, child tables from 24 months (the CDC split: recumbent
+# length before, standing stature after).
+curves:
+  height:
+    source_ref: cdc2000
+    tables:
+      - {file: cdc2000_lenageinf.csv, from_months: 0, to_months: 24}
+      - {file: cdc2000_lenage.csv, from_months: 24, to_months: 240}
+  body_mass:
+    source_ref: cdc2000
+    tables:
+      - {file: cdc2000_wtageinf.csv, from_months: 0, to_months: 24}
+      - {file: cdc2000_wtage.csv, from_months: 24, to_months: 240}
+  head_circumference:
+    source_ref: cdc2000
+    tables:
+      - {file: cdc2000_hcageinf.csv, from_months: 0, to_months: 36}
+# Used only to check derived values, never as a baseline.
+check_tables:
+  body_mass_index: {file: cdc2000_bmiage.csv, from_months: 24, to_months: 240}
