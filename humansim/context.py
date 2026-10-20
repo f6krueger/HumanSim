@@ -24,11 +24,19 @@ from .registry import Registry
 _INHERITED = {"unsourced", "placeholder", "edited", "modified", "interpolated"}
 
 
+CYCLE_PHASES = ("follicular", "midcycle", "luteal", "postmenopausal")
+
+
 @dataclass
 class Context:
     sex: str = "male"
     age: object = "adult"
+    # Hormone levels set by the user (parameter id -> value in registry unit). They replace the baseline
+    # level and drive hormone-stage modifiers.
     hormone_state: dict[str, float] = field(default_factory=dict)
+    hormone_source: str = "user"  # recorded in the trace, e.g. "cycle profile day 14"
+    # Adult women only: where in the menstrual cycle (or after menopause). Defaults to "follicular".
+    cycle_phase: str | None = None
     genotype: dict[str, str] = field(default_factory=dict)
     drugs: dict[str, float] = field(default_factory=dict)
     # Pediatric ages only: the growth-curve z-score (0 = median, the "average child").
@@ -60,6 +68,7 @@ class State:
     solver: dict | None = None  # filled by solver.solve(): iterations, converged, skipped couplings
     ranges: dict | None = None  # pediatric only: per-parameter (low, high) 3rd-97th percentile at this age
     notes: list = field(default_factory=list)
+    phase: str | None = None  # cycle phase used for this state (adult women only)
 
     def get(self, pid: str) -> float | None:
         return self.values[pid]
@@ -75,7 +84,8 @@ class State:
         return out
 
 
-def flag_ranges(registry: Registry, sex: str, values: dict, flags: dict, ranges: dict | None = None) -> None:
+def flag_ranges(registry: Registry, sex: str, values: dict, flags: dict, ranges: dict | None = None,
+                phase: str | None = None) -> None:
     """Flag stored values outside their reference range or their viability limit.
     `ranges` is given only at pediatric ages: then only those age-specific ranges apply, because the
     registry's ranges are adult ranges."""
@@ -85,7 +95,11 @@ def flag_ranges(registry: Registry, sex: str, values: dict, flags: dict, ranges:
             continue
         flags[p.id].discard("outside_reference_range")
         flags[p.id].discard("beyond_viability_limit")
-        rng = ranges.get(p.id) if ranges is not None else p.ref_range.get(sex)  # no range means no flag
+        if ranges is not None:
+            rng = ranges.get(p.id)
+        else:  # a phase-specific range wins over the general one; no range means no flag
+            rng = p.ref_range.get(f"{sex}:{phase}") if phase else None
+            rng = rng or p.ref_range.get(sex)
         if rng and not (rng[0] <= v <= rng[1]):
             flags[p.id].add("outside_reference_range")
         if p.viability_limit and not (p.viability_limit[0] <= v <= p.viability_limit[1]):
@@ -127,6 +141,12 @@ def resolve(registry: Registry, context: Context, modifiers: Iterable[Modifier] 
             notes.append("Pediatric age: height, mass and head size come from CDC 2000 growth curves; other values "
                          "come from ICRP 89 anchor ages (birth, 1, 5, 10, 15 y), linear between anchors and flagged "
                          "interpolated. Parameters with neither have no value; adult values are never used for a child.")
+    if context.cycle_phase is not None:
+        if context.cycle_phase not in CYCLE_PHASES:
+            raise ValueError(f"cycle_phase must be one of {CYCLE_PHASES}, got {context.cycle_phase!r}")
+        if context.sex != "female" or age_key != "adult":
+            raise ValueError("cycle_phase applies to adult women only")
+    phase = (context.cycle_phase or "follicular") if (context.sex == "female" and age_key == "adult") else None
     growth = load_growth() if months is not None else None
     ranges: dict | None = {} if months is not None else None
 
@@ -135,7 +155,9 @@ def resolve(registry: Registry, context: Context, modifiers: Iterable[Modifier] 
     for p in registry:
         if p.kind == "derived":
             continue
-        v = p.baseline(context.sex, age_key)
+        v = p.baseline(context.sex, f"adult:{phase}") if phase else None
+        if v is None:
+            v = p.baseline(context.sex, age_key)
         f_growth = False
         if v is None and growth is not None:
             pt = growth.at(p.id, context.sex, months, context.growth_z)
@@ -181,7 +203,25 @@ def resolve(registry: Registry, context: Context, modifiers: Iterable[Modifier] 
         inverse = [m for m in modifiers if m.stage == "sex" and dict(m.when) == {"sex": "female"}]
         applicable = inverse + applicable
     derived_flag = f"derived_from_{'male' if context.sex == 'female' else 'female'}"
+    hormone_ref: dict[str, float | None] = {}
+    hormones_set = False
+
+    def set_hormones() -> None:
+        for name, x in context.hormone_state.items():
+            if name not in registry or registry[name].group != "hormones":
+                raise KeyError(f"Unknown hormone {name!r}")
+            x = float(x)
+            if not math.isfinite(x) or x < 0:
+                raise ValueError(f"Hormone level for {name!r} must be a non-negative number")
+            hormone_ref[name] = values[name]
+            trace.append(TraceEntry(name, "hormone", context.hormone_source, values[name], x, "hormone level set"))
+            values[name] = x
+            flags[name] = {"hormone_set"} | ({"interpolated"} if context.hormone_source.startswith("cycle profile") else set())
+
     for m in applicable:
+        if m.stage != "sex" and not hormones_set:
+            set_hormones()
+            hormones_set = True
         inverted = (m.stage == "sex" and context.sex == "male"
                     and dict(m.when) == {"sex": "female"})
         for pid, x in m.effects.items():
@@ -194,6 +234,24 @@ def resolve(registry: Registry, context: Context, modifiers: Iterable[Modifier] 
                 if not inverted:
                     trace.append(TraceEntry(pid, m.stage, m.id, before, before,
                                             f"skipped: a stored {context.sex} value exists"))
+                continue
+            if m.op == "log_slope":
+                level, ref_level = values.get(m.driver), hormone_ref.get(m.driver)
+                if before is None or not level or not ref_level:
+                    trace.append(TraceEntry(pid, m.stage, m.id, before, before,
+                                            "skipped: no baseline value or no reference level of the driver"))
+                    continue
+                after = before + x * math.log(level / ref_level)
+                values[pid] = after
+                flags[pid].add("modified")
+                flags[pid].add("hormone_effect")
+                if m.status != "referenced":
+                    flags[pid].add(f"modifier_{m.status}")
+                note = m.note
+                if m.validity and not (m.validity[0] <= level <= m.validity[1]):
+                    flags[pid].add("outside_modifier_validity")
+                    note += f" OUTSIDE the validity range {m.validity[0]}-{m.validity[1]}: extrapolation."
+                trace.append(TraceEntry(pid, m.stage, m.id, before, after, note))
                 continue
             if before is None and (m.op != "set" or inverted):
                 if not inverted:
@@ -217,6 +275,8 @@ def resolve(registry: Registry, context: Context, modifiers: Iterable[Modifier] 
             trace.append(TraceEntry(pid, m.stage, m.id, before, after,
                                     ("inverse of female rule. " if inverted else "") + m.note))
 
+    if not hormones_set:
+        set_hormones()
     if not context.keep_unadjusted:
         for pid, f in flags.items():
             if "no_sex_rule" in f and values.get(pid) is not None:
@@ -236,7 +296,7 @@ def resolve(registry: Registry, context: Context, modifiers: Iterable[Modifier] 
         flags[pid] = {"edited"}
         trace.append(TraceEntry(pid, "edit", "user", before, x))
 
-    flag_ranges(registry, context.sex, values, flags, ranges)
+    flag_ranges(registry, context.sex, values, flags, ranges, phase)
     missing_inputs = finalize_derived(values, flags)
 
-    return State(context, registry, values, flags, trace, missing_inputs, ranges=ranges, notes=notes)
+    return State(context, registry, values, flags, trace, missing_inputs, ranges=ranges, notes=notes, phase=phase)

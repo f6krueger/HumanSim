@@ -16,7 +16,7 @@ import yaml
 from .registry import DATA_DIR, RegistryError
 
 STAGES = ("sex", "hormone", "genotype", "drug")
-OPS = ("ratio", "offset", "set")
+OPS = ("ratio", "offset", "set", "log_slope")  # log_slope: after = before + x * ln(driver level / reference level)
 # anatomical: a shape difference beyond what body size explains; scaling: explained by body size
 # alone; physiological: a measured sex difference with no cause attributed; hormonal: reserved for
 # the hormone module; assumed_neutral: assumed to have no sex difference (not sourced).
@@ -34,6 +34,8 @@ class Modifier:
     source_ref: str | None = None
     note: str = ""
     rule_type: str = ""
+    driver: str | None = None  # log_slope: the hormone whose level drives the effect
+    validity: tuple[float, float] | None = None  # log_slope: range of the driver the fit is valid for
 
     def __post_init__(self) -> None:
         if self.rule_type and self.rule_type not in RULE_TYPES:
@@ -44,6 +46,13 @@ class Modifier:
             raise RegistryError(f"Modifier {self.id!r}: op must be one of {OPS}")
         if not self.effects:
             raise RegistryError(f"Modifier {self.id!r}: no effects")
+        if self.op == "log_slope":
+            if not self.driver:
+                raise RegistryError(f"Modifier {self.id!r}: log_slope needs a driver")
+            if f"hormone:{self.driver}" not in self.when:
+                raise RegistryError(f"Modifier {self.id!r}: log_slope must be conditioned on hormone:{self.driver}")
+        elif self.driver:
+            raise RegistryError(f"Modifier {self.id!r}: only log_slope modifiers take a driver")
 
     def applies(self, ctx) -> bool:
         """`when` keys: sex, age (equality); hormone:<name>, drug:<name> (present in context);
@@ -69,6 +78,8 @@ class Modifier:
         if self.op == "set":
             return float(x)
         assert before is not None
+        if self.op == "log_slope":
+            raise RuntimeError("log_slope needs the driver levels; the resolver applies it")
         return before * x if self.op == "ratio" else before + x
 
 
@@ -78,5 +89,7 @@ def load_modifiers(data_dir: str | Path | None = None) -> list[Modifier]:
     for path in sorted((root / "modifiers").glob("*.yaml")):
         doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         for raw in doc.get("modifiers") or []:
+            if raw.get("validity") is not None:
+                raw["validity"] = tuple(raw["validity"])
             out.append(Modifier(**raw))
     return out

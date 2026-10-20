@@ -157,16 +157,17 @@ def _range(raw: object, where: str) -> tuple[float, float] | None:
 
 
 def _sex_ranges(raw: object, where: str) -> dict[str, tuple[float, float]]:
-    """ref_range is given per sex: {male: [lo, hi], female: [lo, hi]}."""
+    """ref_range is given per sex, optionally per cycle phase: {male: [lo, hi], "female:luteal": [lo, hi]}."""
     if raw is None:
         return {}
     if not isinstance(raw, dict):
         raise RegistryError(f"{where}: ref_range must be a mapping like {{male: [lo, hi]}}")
     out = {}
-    for sex, rng in raw.items():
+    for key, rng in raw.items():
+        sex = str(key).split(":", 1)[0]  # "female:luteal" is a range for one cycle phase
         if sex not in ("male", "female"):
-            raise RegistryError(f"{where}: ref_range sex must be male or female, got {sex!r}")
-        out[sex] = _range(rng, where)
+            raise RegistryError(f"{where}: ref_range sex must be male or female, got {key!r}")
+        out[key] = _range(rng, where)
     return out
 
 

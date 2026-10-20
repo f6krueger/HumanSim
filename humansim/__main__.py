@@ -38,8 +38,24 @@ def _context(args, reg: Registry) -> Context:
         age = int(age) if age.is_integer() else age
     except ValueError:
         pass
-    return Context(sex=args.sex, age=age, growth_z=getattr(args, 'z', 0.0), edits=_parse_edits(reg, args.set),
-                   keep_unadjusted=getattr(args, 'keep_unadjusted', False))
+    hormones = {}
+    for item in getattr(args, "hormone", None) or []:
+        pid, _, text = item.partition("=")
+        if pid not in reg or reg[pid].group != "hormones" or not text:
+            raise SystemExit(f"--hormone needs ID=VALUE for a hormone parameter, got {item!r}")
+        hormones[pid] = parse_value(text, reg[pid].unit)
+    kwargs = dict(sex=args.sex, age=age, growth_z=getattr(args, "z", 0.0), edits=_parse_edits(reg, args.set),
+                  keep_unadjusted=getattr(args, "keep_unadjusted", False), hormone_state=hormones,
+                  cycle_phase=getattr(args, "cycle_phase", None))
+    day = getattr(args, "cycle_day", None)
+    if day is not None:
+        if args.sex != "female":
+            raise SystemExit("--cycle-day applies to --sex female")
+        from .cycle import cycle_context
+        ctx = cycle_context(reg, day, age=age, edits=kwargs["edits"], keep_unadjusted=kwargs["keep_unadjusted"])
+        ctx.hormone_state.update(hormones)
+        return ctx
+    return Context(**kwargs)
 
 
 def _print_checks(results) -> int:
@@ -61,6 +77,11 @@ def main(argv: list[str] | None = None) -> int:
                        help="pediatric ages only: growth-curve z-score (0 = median; 1 = about the 84th percentile)")
         p.add_argument("--set", action="append", metavar="ID=VALUE",
                        help="override a parameter, e.g. body_mass=90 or body_mass='198 lb'")
+        p.add_argument("--hormone", action="append", metavar="ID=VALUE",
+                       help="set a hormone level, e.g. testosterone_total=1345 (ng/dL); drives hormone effects")
+        p.add_argument("--cycle-phase", choices=["follicular", "midcycle", "luteal", "postmenopausal"],
+                       help="adult women: use this phase's reference hormone values")
+        p.add_argument("--cycle-day", type=float, help="adult women: cycle day 1-28 (interpolated profile)")
         p.add_argument("--solve", action="store_true",
                        help="run the steady-state solver so edits ripple through the couplings")
         p.add_argument("--keep-unadjusted", action="store_true",

@@ -61,7 +61,10 @@ def main() -> None:
             src = "ansur2"
         else:
             rtype = "physiological"
-            note = f"Female/male ratio {ratio:.4f} from the stored pair." + ICRP_CAVEAT
+            if p.group == "hormones":
+                note = f"Female/male ratio {ratio:.4f} of the two reference-interval midpoints."
+            else:
+                note = f"Female/male ratio {ratio:.4f} from the stored pair." + ICRP_CAVEAT
             src = p.source_ref
         status = "referenced" if src else "unsourced"
         counts[rtype] = counts.get(rtype, 0) + 1

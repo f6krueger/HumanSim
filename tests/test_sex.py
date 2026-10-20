@@ -83,13 +83,14 @@ def test_set_rule_cannot_be_inverted_for_male():
 def test_every_sex_rule_targets_a_valid_parameter_once(registry, mods):
     assert modifier_checks(registry, mods)[0].status == "pass"
     assert len(mods) > 150  # one rule per stored male/female pair, plus assumed-neutral ones
-    assert {m.stage for m in mods} == {"sex"}
-    assert all(m.when == {"sex": "female"} for m in mods)
+    assert {m.stage for m in mods} == {"sex", "hormone"}
+    assert all(m.stage == "hormone" for m in mods if m.rule_type == "hormonal")
+    assert all(m.when == {"sex": "female"} for m in mods if m.stage == "sex")
 
 
 def test_rule_types_are_labelled_and_sourced(mods):
     types = {m.rule_type for m in mods}
-    assert types == {"scaling", "anatomical", "physiological", "assumed_neutral"}
+    assert types == {"scaling", "anatomical", "physiological", "assumed_neutral", "hormonal"}
     for m in mods:
         assert m.status in ("referenced", "unsourced")
         if m.status == "referenced":
@@ -148,7 +149,8 @@ def test_female_edits_override_and_propagate(registry, mods):
 def test_female_coverage_check_lists_missing_rules(female):
     r = sex_rule_coverage(female)
     assert r.status == "warn" and "brain_metabolic_load" in r.details["no_sex_rule"]
-    assert sex_rule_coverage(resolve(Registry.load(), Context())).status == "pass"  # no female-only values yet
+    male_cov = sex_rule_coverage(resolve(Registry.load(), Context()))
+    assert "prolactin" in male_cov.details["no_sex_rule"]  # a female-only hormone has no male value
 
 
 # --- reference ranges are per sex -------------------------------------------------------------

@@ -58,3 +58,33 @@ sources:
     evidence: A
     verified_via: "CDC and WHO sites were not reachable from the workspace. The tables were taken from the MIT-licensed PyPI package growthcharts 0.2.1 (a third-party copy of the CDC data) and spot-checked: male birth length 49.99 cm and weight 3.53 kg, female age-20 median stature 163.34 cm and weight 58.2 kg match the published CDC values I know. Not compared row by row with the CDC files."
     notes: "US children measured mainly 1963-1994, so not a current or non-US reference. CDC itself recommends the WHO standards below age 2; the CDC infant tables are used here because WHO tables were not retrievable. Data are a US government work. Medians are used as 'the average child'."
+  mayo_ridgeview:
+    citation: "Mayo Clinic Laboratories, Testosterone, Total, Bioavailable, and Free, Serum (test LABTSTBF), reference values by sex and age and Tanner stage, as published on the Ridgeview Medical Center test catalog (ridgeviewmedical.testcatalog.org/show/LABTSTBF). Portions (c) 2026 Mayo Foundation for Medical Education and Research."
+    url: "https://ridgeviewmedical.testcatalog.org/show/LABTSTBF"
+    evidence: C
+    verified_via: "page retrieved; reference-value tables read"
+    notes: "A single reference laboratory's intervals, mirrored on a hospital catalog page. The page does not state how the interval is defined; the central 95% convention is assumed. Total testosterone, bioavailable and free testosterone by age are given; only adult total testosterone is used so far."
+  mainegeneral:
+    citation: "Maine General Medical Center laboratory test catalog: Luteinizing Hormone (LH), Follicle-Stimulating Hormone (FSH) and Sex Hormone-Binding Globulin (SHBG1) serum reference values (mainegeneral.testcatalog.org)."
+    url: "https://mainegeneral.testcatalog.org/show/LH"
+    evidence: C
+    verified_via: "pages retrieved; reference-value sections read"
+    notes: "Single-laboratory reference intervals. Interval definition not stated (central 95% assumed). The LH, FSH and SHBG pages come from the same catalog."
+  christianacare:
+    citation: "ChristianaCare laboratory test catalog: Estradiol, Serum (test E2) reference ranges (christianacare.testcatalog.org/show/E2)."
+    url: "https://christianacare.testcatalog.org/show/E2"
+    evidence: C
+    verified_via: "page retrieved; reference-value section read"
+    notes: "Single-laboratory reference intervals; no pediatric interval was listed."
+  crouse_atellica:
+    citation: "Laboratory Alliance of Central New York, Atellica Hormone Reference Ranges, effective 15 February 2022 (providerportal.crouse.org). Progesterone, cortisol and prolactin intervals."
+    url: "https://providerportal.crouse.org/wp-content/uploads/2022/02/Hormone-Reference-Range-2-15-22.pdf"
+    evidence: C
+    verified_via: "PDF retrieved; ranges read"
+    notes: "Single-laboratory intervals. Cortisol is given without a sex qualifier."
+  bhasin2001:
+    citation: "Bhasin S, Woodhouse L, Casaburi R, et al. Testosterone dose-response relationships in healthy young men. Am J Physiol Endocrinol Metab 2001;281(6):E1172-E1181."
+    url: "https://pubmed.ncbi.nlm.nih.gov/11701431/"
+    evidence: B
+    verified_via: "abstract retrieved via PubMed: 61 men aged 18-35, GnRH agonist suppression, weekly testosterone enanthate 25, 50, 125, 300 or 600 mg for 20 weeks; nadir serum testosterone 253, 306, 542, 1345, 2370 ng/dL; fat-free mass +3.4, +5.2, +7.9 kg at 125, 300, 600 mg. The full paper was not read."
+    notes: "Men with their own testosterone suppressed, after 20 weeks, so a sustained-level effect. Effects on haemoglobin and fat mass are reported only as correlations in the abstract, with no numbers."

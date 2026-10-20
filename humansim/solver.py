@@ -3,7 +3,7 @@
 solve() resolves the context twice: once as given (with user edits) and once as the reference
 (same sex and age, no edits). It then applies the couplings until the values stop moving.
 
-* A parameter the user edited is pinned: couplings never overwrite it.
+* A parameter the user edited, or that a hormone, genotype or drug effect set, is pinned: couplings never overwrite it.
 * Every other target is set to reference_value * g, where g is the coupling's ratio (see
   couplings.py). Compensation couplings have a deadband, so a change inside normal variation moves
   nothing; accounting couplings apply immediately.
@@ -28,15 +28,18 @@ from .registry import Registry
 def solve(registry: Registry, context: Context, modifiers: Iterable[Modifier],
           couplings: Iterable[Coupling], tol: float = 1e-9, max_iter: int = 200) -> State:
     modifiers, couplings = list(modifiers), list(couplings)
-    ref = resolve(registry, Context(sex=context.sex, age=context.age, hormone_state=context.hormone_state, growth_z=context.growth_z,
-                                    genotype=context.genotype, drugs=context.drugs,
-                                    keep_unadjusted=context.keep_unadjusted), modifiers)
+    # The reference is the same person without anything the user imposed: no edits, and no hormone
+    # level, genotype or drug. Their effects therefore count as changes the couplings must respond to.
+    ref = resolve(registry, Context(sex=context.sex, age=context.age, cycle_phase=context.cycle_phase,
+                                    growth_z=context.growth_z, keep_unadjusted=context.keep_unadjusted), modifiers)
     state = resolve(registry, context, modifiers)
     for c in couplings:
         if c.target not in registry or registry[c.target].kind == "derived":
             raise KeyError(f"Coupling {c.id!r} targets unknown or derived parameter {c.target!r}")
 
-    pinned = set(context.edits)
+    # Parameters the user edited, or that a hormone/genotype/drug effect set directly, are pinned.
+    pinned = set(context.edits) | {t.param for t in state.trace
+                                    if t.stage in ("hormone", "genotype", "drug") and t.after is not None}
     values = dict(state.values)
     # Derived values are recomputed from the current stored values inside each coupling that needs them.
     skipped: dict[str, str] = {}
@@ -93,7 +96,7 @@ def solve(registry: Registry, context: Context, modifiers: Iterable[Modifier],
             note += f"; OUTSIDE validity {c.validity[0]}-{c.validity[1]}: extrapolation"
         trace.append(TraceEntry(c.target, "solve", c.id, before, after, note))
 
-    flag_ranges(registry, context.sex, values, flags, state.ranges)
+    flag_ranges(registry, context.sex, values, flags, state.ranges, state.phase)
     missing_inputs = finalize_derived(values, flags)
     return State(context, registry, values, flags, trace, missing_inputs, ranges=state.ranges, notes=state.notes,
                  solver={"iterations": iterations, "converged": converged, "skipped": skipped,

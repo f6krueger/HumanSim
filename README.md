@@ -4,9 +4,9 @@ A Python library that models the human body as a network of interconnected anato
 physiological parameters, for population averages (not individuals). You set a context, edit any
 value, and see what changes. See `docs/SPEC.md` for the full design.
 
-**Status: Phase 4.** The core, derived layer, consistency checks, modifier machinery, adult male and
+**Status: Phase 5.** The core, derived layer, consistency checks, modifier machinery, adult male and
 female baselines (both stored, either derivable from the other), a steady-state solver and an age
-axis for birth to 20 years exist. Hormones, pharmacology and genetics are specified but not built yet. Run `python -m humansim coverage` to see exactly how much data there is.
+axis for birth to 20 years, sex hormones (levels, one dose-response effect, two dynamic models) exist. Pharmacology and genetics are specified but not built yet. Run `python -m humansim coverage` to see exactly how much data there is.
 
 ## Install and run
 
@@ -184,6 +184,34 @@ fetal tables (ICRP Tables 2.1-2.7) are not modelled. The CDC and WHO sites were 
 tables came from a third-party PyPI copy and were spot-checked, not compared row by row. CDC data are
 US children measured mainly 1963-1994.
 
+## Hormones and dynamics (Phase 5)
+
+**Levels.** `data/values/hormones.yaml` holds testosterone, SHBG, LH, FSH, oestradiol, progesterone,
+cortisol and prolactin. Women's values depend on cycle phase (`Context(cycle_phase=...)`:
+follicular, midcycle, luteal, postmenopausal; default follicular). A value here is the **midpoint of a
+published single-laboratory reference interval, not a population mean**, and is flagged as such.
+
+**Setting a hormone.** `Context(hormone_state={"testosterone_total": 1345})` or
+`--hormone testosterone_total=1345`. The level is recorded in the trace and flagged `hormone_set`.
+
+**One sourced effect.** Testosterone changes skeletal muscle mass by `2.95 kg x ln(T / T_ref)`
+(`log_slope` modifier; slope fitted to the three dose groups of Bhasin 2001, fat-free mass taken as
+muscle). It applies to men only and is flagged outside 542-2370 ng/dL, the studied range. With `--solve`
+the change is pinned (couplings do not undo it) and ripples to body mass, metabolic rate, BMI and the
+composition fractions. The solver's reference state now excludes hormone levels, so a hormone effect
+counts as a change to respond to.
+
+**Dynamics.** `dynamics.py` is a generic RK4 engine. `hpg.py` is a three-variable male feedback model
+(LH, testicular responsiveness, testosterone) that sits at the reference with no input, is suppressed
+by exogenous testosterone and recovers over weeks. `cycle.py` interpolates the stored phase values into a
+28-day profile (`--sex female --cycle-day 14`).
+
+**Limits.** The HPG structure, feedback strength and all three time constants are **assumptions**
+(results carry `assumed`), not fitted to data. The cycle profile joins phase midpoints linearly, so it
+misses the sharp LH peak. The Bhasin effect uses only the slope, from men 18-35 at 20 weeks of
+suppressed-own-production dosing, and says nothing about haemoglobin or other tissues. No female feedback
+model, no pediatric or ageing hormone levels yet.
+
 ## Layout
 
 ```
@@ -197,6 +225,9 @@ humansim/
   context.py         Context, State and resolve()
   couplings.py       coupling records, deadband and the coupling functions
   solver.py          steady-state solve()
+  dynamics.py        generic RK4 ODE engine
+  hpg.py             male HPG feedback model (assumed structure)
+  cycle.py           menstrual-cycle hormone profile
   data/couplings/    the Phase 3 couplings (steady_state.yaml)
   growth.py          CDC growth-curve (LMS) lookup for the age axis
   data/growth/       CDC 2000 LMS tables and curves.yaml

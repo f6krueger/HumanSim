@@ -5,6 +5,8 @@ from __future__ import annotations
 import pint
 
 ureg = pint.UnitRegistry()
+# Biological activity has no fixed mass equivalent, so it gets its own dimension (not convertible to mass).
+ureg.define("international_unit = [biological_activity] = IU")
 
 
 class UnitError(ValueError):
