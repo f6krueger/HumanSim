@@ -326,3 +326,26 @@ def dataset_checks(registry: Registry, sources: dict[str, dict], extra_used=()) 
         f"Sources not used by any parameter: {', '.join(unused)}" if unused
         else "Every source is used.", {"unused": unused}))
     return results
+
+
+def drug_checks(registry: Registry, drugs: dict, sources: dict[str, dict], modifiers=()) -> list[CheckResult]:
+    """Drug records: sources exist, and the one-compartment half-life is compared with the label's."""
+    from .context import Context, resolve
+    from .pharmacology import half_life_check
+
+    out = []
+    missing = sorted(d.id for d in drugs.values() if d.source_ref not in sources)
+    out.append(CheckResult("drug_sources_exist", "fail" if missing else "pass",
+                           f"Drugs citing unknown sources: {', '.join(missing)}" if missing
+                           else f"{len(drugs)} drugs, every source exists."))
+    state = resolve(registry, Context(), modifiers)
+    for d in drugs.values():
+        model, label = half_life_check(registry, d, state, modifiers)
+        if not label:
+            continue
+        gap = (model - label) / label
+        out.append(CheckResult(f"drug_half_life:{d.id}", "pass" if abs(gap) <= 0.25 else "warn",
+                               f"One-compartment half-life {model:.2f} h vs label {label:g} h ({gap:+.0%}). "
+                               "A gap means the real drug distributes into more than one compartment.",
+                               {"model": model, "label": label}))
+    return out

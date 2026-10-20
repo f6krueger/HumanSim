@@ -1,4 +1,4 @@
-# Human Reference Simulation: Specification (v0.6 draft)
+# Human Reference Simulation: Specification (v0.7 draft)
 
 Working name: `humansim` (rename any time). Code license: Apache-2.0. Data license: CC BY 4.0 (both easy to change; see section 14).
 
@@ -133,7 +133,7 @@ Each phase ends with something usable.
 3. **Steady-state solver:** metabolic chain and liver test; deadband on compensation couplings, accounting couplings immediate, validity ranges. Built as reference-calibrated ratio couplings (see README). Three tiers in the original sense (reference / compensation / viability) are only partly present: viability limits are still unpopulated, so "range undefined" applies.
 4. **Development module:** age axis. Built for height, mass and head circumference from CDC 2000 growth curves (birth to 20 y). ICRP 89 anchor-age tables (birth, 1, 5, 10, 15 y, adult) for organs and physiology are built in, linear between anchors and flagged. Fetal tables, puberty timing and ageing after 20 are not.
 5. **Dynamic solver and hormones:** first axis (sex hormones), then others. Built for sex hormones: reference levels (interval midpoints, by cycle phase for women), a log-slope hormone-effect modifier (testosterone to muscle mass, Bhasin 2001), solver carry-through of hormone effects, a generic RK4 ODE engine, an assumed-structure male HPG feedback model, and an interpolated menstrual-cycle profile. No female feedback model, no hormone effects other than testosterone-muscle, no pediatric hormone levels, no ageing of hormones yet.
-6. **Pharmacology:** PBPK on the existing anatomy, with a small seed drug set.
+6. **Pharmacology:** Built as a scaled one-compartment IV model, not yet PBPK: two seed drugs (acetaminophen, midazolam) from FDA/Pfizer labels, clearance and volume scaled by the person's liver mass, hepatic blood flow and body mass (assumed exponents). No oral absorption, no renal drugs, no drug effects on the body, no variability. Full PBPK on the organ flows and masses already in the registry is the next step.
 7. **Genetics:** variant table and its effects on parameters and drug clearance.
 8. **Web UI.**
 9. **Ongoing:** citation work, new data, new axes.

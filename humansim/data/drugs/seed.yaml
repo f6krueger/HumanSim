@@ -1,0 +1,26 @@
+# Seed drug set. Values are per kg of body mass in healthy adults, from the cited labels.
+# scaling: how the reference clearance and volume move with the person's model values. Exponents are
+# ASSUMPTIONS (mechanistic reasoning, not fitted), labelled in `scaling_note`.
+drugs:
+  - id: acetaminophen
+    name: Acetaminophen (paracetamol), intravenous
+    routes: [iv]
+    clearance_l_h_kg: 0.27
+    volume_l_kg: 0.8
+    label_half_life_h: 2.4
+    status: referenced
+    source_ref: fda_apap_iv_2021
+    clearance_scaling: {liver_mass: 1.0}
+    volume_scaling: {body_mass: 1.0}
+    scaling_note: "Assumed: low-extraction hepatic drug, so clearance follows liver mass (capacity-limited) and volume follows body mass. Clearance and Vss are label means; one compartment with Vss gives a half-life shorter than the label's because the real drug distributes into more than one compartment."
+  - id: midazolam
+    name: Midazolam, intravenous
+    routes: [iv]
+    clearance_l_h_kg: 0.395
+    volume_l_kg: 2.05
+    label_half_life_h: 3.0
+    status: referenced
+    source_ref: pfizer_midazolam_label
+    clearance_scaling: {hepatic_blood_flow: 0.5, liver_mass: 0.5}
+    volume_scaling: {body_mass: 1.0}
+    scaling_note: "Assumed: CYP3A4 clearance sits between flow-limited and capacity-limited, so it is split evenly between hepatic blood flow and liver mass. Values are midpoints of ranges across six studies (0.25-0.54 L/h/kg; 1.0-3.1 L/kg), not means."

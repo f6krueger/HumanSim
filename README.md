@@ -4,9 +4,9 @@ A Python library that models the human body as a network of interconnected anato
 physiological parameters, for population averages (not individuals). You set a context, edit any
 value, and see what changes. See `docs/SPEC.md` for the full design.
 
-**Status: Phase 5.** The core, derived layer, consistency checks, modifier machinery, adult male and
+**Status: Phase 6.** The core, derived layer, consistency checks, modifier machinery, adult male and
 female baselines (both stored, either derivable from the other), a steady-state solver and an age
-axis for birth to 20 years, sex hormones (levels, one dose-response effect, two dynamic models) exist. Pharmacology and genetics are specified but not built yet. Run `python -m humansim coverage` to see exactly how much data there is.
+axis for birth to 20 years, sex hormones (levels, one dose-response effect, two dynamic models) exist. A first pharmacokinetics layer exists. Genetics is specified but not built yet. Run `python -m humansim coverage` to see exactly how much data there is.
 
 ## Install and run
 
@@ -212,6 +212,28 @@ misses the sharp LH peak. The Bhasin effect uses only the slope, from men 18-35 
 suppressed-own-production dosing, and says nothing about haemoglobin or other tissues. No female feedback
 model, no pediatric or ageing hormone levels yet.
 
+## Pharmacology (Phase 6)
+
+`python -m humansim pk --drug midazolam --dose 5 --sex female --set liver_mass=2.5 --solve`
+
+`pharmacology.py` computes the plasma concentration of a drug after intravenous doses (boluses or
+infusions, repeated if needed) in a one-compartment model. Each drug in `data/drugs/` carries a
+reference clearance and volume per kg from a cited label. For a person they are scaled by that
+person's own model values (liver mass, hepatic blood flow, body mass) relative to the same sex and age
+unedited, so editing or solving the body changes the curve. Results are flagged `assumed_scaling`,
+`one_compartment` and `scaled_from_changed_body`. Time is in hours.
+
+Seed drugs: **acetaminophen IV** (FDA label: CL 0.27 L/h/kg, Vss 0.8 L/kg) and **midazolam IV** (Pfizer
+label: CL 0.25-0.54 L/h/kg and V 1.0-3.1 L/kg; the model uses range midpoints, which are not means).
+
+**Limits.** This is not PBPK. A single compartment understates the early peak (an acetaminophen 1 g
+infusion gives about 16 mg/L against the label's 28) and gives half-lives 14% short (acetaminophen) and 20% long
+(midazolam) of the label; `check` reports both. The scaling exponents are assumptions. Not modelled: oral
+absorption (no sourced bioavailability or absorption rate), renal drugs (no sourced clearance values; the
+gentamicin and caffeine pages I could reach had none), metabolites, protein binding, drug effects on
+the body, and between-person variability. Per-kg label values are applied to both sexes because the labels
+do not give volunteer sex or mass.
+
 ## Layout
 
 ```
@@ -228,6 +250,8 @@ humansim/
   dynamics.py        generic RK4 ODE engine
   hpg.py             male HPG feedback model (assumed structure)
   cycle.py           menstrual-cycle hormone profile
+  pharmacology.py    one-compartment IV pharmacokinetics
+  data/drugs/        drug records (seed.yaml)
   data/couplings/    the Phase 3 couplings (steady_state.yaml)
   growth.py          CDC growth-curve (LMS) lookup for the age axis
   data/growth/       CDC 2000 LMS tables and curves.yaml

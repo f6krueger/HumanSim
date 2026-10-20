@@ -88,3 +88,15 @@ sources:
     evidence: B
     verified_via: "abstract retrieved via PubMed: 61 men aged 18-35, GnRH agonist suppression, weekly testosterone enanthate 25, 50, 125, 300 or 600 mg for 20 weeks; nadir serum testosterone 253, 306, 542, 1345, 2370 ng/dL; fat-free mass +3.4, +5.2, +7.9 kg at 125, 300, 600 mg. The full paper was not read."
     notes: "Men with their own testosterone suppressed, after 20 weeks, so a sustained-level effect. Effects on haemoglobin and fat mass are reported only as correlations in the abstract, with no numbers."
+  fda_apap_iv_2021:
+    citation: "Acetaminophen for injection (1,000 mg/100 mL vial), prescribing information, Mylan Institutional, revised 1/2021 (FDA NDA 204957/206610 label), section 12.3 Pharmacokinetics, Table 5."
+    url: "https://www.accessdata.fda.gov/drugsatfda_docs/label/2021/206610s000lbl.pdf"
+    evidence: B
+    verified_via: "label text retrieved via WebFetch: single 1,000 mg IV dose in adults, CL 0.27 L/h/kg (SD 0.08), Vss 0.8 L/kg (SD 0.2), half-life 2.4 h (SD 0.6), Cmax 28 mcg/mL, AUC0-6h 43 mcg*h/mL; <5% unchanged in urine; protein binding 10-25%."
+    notes: "Label values from healthy adult volunteers; the label does not state their body mass or sex, so per-kg values are applied to both sexes. Oral bioavailability is not stated, so no oral route is modelled."
+  pfizer_midazolam_label:
+    citation: "Midazolam injection, prescribing information, Clinical Pharmacology (Pharmacokinetics, Distribution, Metabolism, Excretion), Pfizer Medical Information."
+    url: "https://www.pfizermedical.com/midazolam/clinical-pharmacology"
+    evidence: B
+    verified_via: "page text retrieved via WebFetch: clearance 0.25-0.54 L/h/kg and volume of distribution 1.0-3.1 L/kg from six single-dose studies in healthy adults; half-life 1.8-6.4 h (mean about 3 h); CYP3A4 in liver and gut wall; <0.5% unchanged in urine."
+    notes: "The label gives ranges across studies, not a mean; the model uses range midpoints, which are not means. No oral bioavailability or extraction ratio is stated, so only intravenous dosing is modelled."

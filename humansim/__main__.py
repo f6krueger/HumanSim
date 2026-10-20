@@ -5,9 +5,10 @@ from __future__ import annotations
 import argparse
 import sys
 
-from .checks import coupling_checks, growth_continuity, dataset_checks, modifier_checks, state_checks
+from .checks import drug_checks, coupling_checks, growth_continuity, dataset_checks, modifier_checks, state_checks
 from .context import Context, resolve
 from .couplings import load_couplings
+from .pharmacology import Dose, load_drugs, simulate as pk_simulate
 from .growth import load_growth
 from .modifiers import load_modifiers
 from .registry import Registry
@@ -100,6 +101,13 @@ def main(argv: list[str] | None = None) -> int:
     p_chk = sub.add_parser("check", help="run consistency checks")
     add_context_args(p_chk)
 
+    p_pk = sub.add_parser("pk", help="drug concentration over time after intravenous doses")
+    add_context_args(p_pk)
+    p_pk.add_argument("--drug", required=True)
+    p_pk.add_argument("--dose", type=float, required=True, help="mg")
+    p_pk.add_argument("--infusion", type=float, default=0.0, help="infusion time in hours (0 = bolus)")
+    p_pk.add_argument("--hours", type=float, default=24.0)
+
     sub.add_parser("compare", help="male and female side by side")
     sub.add_parser("validate", help="sex rules vs stored pairs, and ANSUR II ratios vs an independent dataset")
 
@@ -127,6 +135,22 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, KeyError) as exc:
         raise SystemExit(f"error: {exc.args[0] if exc.args else exc}") from None
 
+    if args.cmd == "pk":
+        drugs = load_drugs()
+        if args.drug not in drugs:
+            raise SystemExit(f"error: unknown drug {args.drug!r}; known: {', '.join(drugs)}")
+        try:
+            r = pk_simulate(reg, state, drugs[args.drug], [Dose(args.dose, 0.0, args.infusion)], args.hours,
+                            modifiers)
+        except ValueError as exc:
+            raise SystemExit(f"error: {exc}") from None
+        print(f"{r.drug.name}, {args.dose:g} mg IV, {state.context.sex}")
+        print(f"clearance {r.clearance_l_h:.1f} L/h, volume {r.volume_l:.1f} L, half-life {r.half_life_h:.2f} h")
+        print(f"Cmax {r.cmax_mg_l:.2f} mg/L, AUC over {args.hours:g} h {r.auc_mg_h_l():.1f} mg*h/L")
+        print(f"flags: {', '.join(sorted(r.flags))}")
+        print(f"note: {r.notes[0]}")
+        return 0
+
     if args.cmd == "show":
         print(format_state(state, group=args.group, only_changed=args.changed,
                            hide_missing=not args.all))
@@ -149,11 +173,13 @@ def main(argv: list[str] | None = None) -> int:
     couplings = load_couplings(reg)
     cited = ({m.source_ref for m in modifiers} | {c.source_ref for c in couplings}
              | {load_validation("nchs_sex_ratios")["source_ref"], "mifflin1990"}
-             | {c['source_ref'] for c in load_growth()._curves.values()}) - {None}
+             | {c['source_ref'] for c in load_growth()._curves.values()}
+             | {d.source_ref for d in load_drugs().values()}) - {None}
     results = (state_checks(state) + dataset_checks(reg, sources, cited)
                + modifier_checks(reg, modifiers, sources)
                + coupling_checks(reg, couplings, sources)
-               + growth_continuity(reg, state.context.sex))
+               + growth_continuity(reg, state.context.sex)
+               + drug_checks(reg, load_drugs(), sources, modifiers))
     return _print_checks(results)
 
 
