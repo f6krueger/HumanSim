@@ -4,9 +4,9 @@ A Python library that models the human body as a network of interconnected anato
 physiological parameters, for population averages (not individuals). You set a context, edit any
 value, and see what changes. See `docs/SPEC.md` for the full design.
 
-**Status: Phase 7 plus a gene-edit sandbox.** The core, derived layer, consistency checks, modifier machinery, adult male and
+**Status: all eight phases have a first version (core, sex, solver, development, hormones, pharmacology, genetics and gene edits, UI).** The core, derived layer, consistency checks, modifier machinery, adult male and
 female baselines (both stored, either derivable from the other), a steady-state solver and an age
-axis for birth to 20 years, sex hormones (levels, one dose-response effect, two dynamic models) exist. A first pharmacokinetics layer and a one-gene pharmacogenetics layer exist. The UI is not built yet. Run `python -m humansim coverage` to see exactly how much data there is.
+axis for birth to 20 years, sex hormones (levels, one dose-response effect, two dynamic models) exist. A first pharmacokinetics layer and a one-gene pharmacogenetics layer exist. A local web UI is included. Run `python -m humansim coverage` to see exactly how much data there is.
 
 ## Install and run
 
@@ -297,6 +297,25 @@ Not modelled: delivery, editing efficiency (you supply the fraction), off-target
 immune responses, effects on traits that depend on many genes, interactions between edits, and any
 consequence over time.
 
+## Web UI
+
+```
+python -m humansim serve --open      # http://127.0.0.1:8765/
+```
+
+A single page with five views: **Body** (every parameter, editable; changed values highlighted; flags and a
+"what changed and why" list), **Male vs female**, **Hormones** (cycle day slider with profile charts for
+women; testosterone setting and the assumed feedback simulation for men), **Drugs** (IV concentration curves,
+with CYP2C9 genotype for ibuprofen) and **Gene edits** (somatic or germline, catalogue, your own
+hypotheses). The sidebar sets sex, age (0-20 y, 20 = adult) and whether edits ripple through the solver. A
+yellow banner stays visible whenever the state contains hypothetical gene-edit effects.
+
+It runs on your machine only: standard library, no extra dependencies, listens on 127.0.0.1, refuses
+requests whose Host header is not loopback, stores nothing. Edits to values are in the parameter's unit
+(shown in the table). The page works offline; the layout adapts to a phone-width screen and to light and dark mode.
+Note that once any hypothetical edit is active, every value the solver moves is flagged
+`downstream_of_hypothetical`, including values the edit may not really affect; the flag is conservative.
+
 ## Layout
 
 ```
@@ -316,6 +335,8 @@ humansim/
   pharmacology.py    one-compartment IV pharmacokinetics
   genetics.py        pharmacogene alleles, activity scores, frequencies
   editing.py         somatic and germline gene edits, measured or hypothetical
+  server.py          local web server and JSON API
+  web/index.html     the single-page UI
   data/genetics/     gene records (genes.yaml)
   data/drugs/        drug records (seed.yaml)
   data/couplings/    the Phase 3 couplings (steady_state.yaml)

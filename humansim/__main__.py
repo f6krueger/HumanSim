@@ -173,12 +173,20 @@ def main(argv: list[str] | None = None) -> int:
     p_genes = sub.add_parser("genes", help="pharmacogenes, activity scores and population frequencies")
     p_genes.add_argument("--population", default="european")
 
+    p_serve = sub.add_parser("serve", help="start the local web UI")
+    p_serve.add_argument("--port", type=int, default=8765)
+    p_serve.add_argument("--open", action="store_true", help="open the page in your browser")
+
     sub.add_parser("catalogue", help="gene-edit catalogue with the tier of every effect")
 
     sub.add_parser("compare", help="male and female side by side")
     sub.add_parser("validate", help="sex rules vs stored pairs, and ANSUR II ratios vs an independent dataset")
 
     args = ap.parse_args(argv)
+    if args.cmd == "serve":
+        from .server import serve
+        serve(args.port, args.open)
+        return 0
     reg = Registry.load()
 
     if args.cmd == "coverage":

@@ -21,7 +21,7 @@ humansim = "humansim.__main__:main"
 include = ["humansim*"]
 
 [tool.setuptools.package-data]
-humansim = ["data/**/*.yaml", "data/**/*.csv"]
+humansim = ["data/**/*.yaml", "data/**/*.csv", "web/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>HumanSim</title>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#1b2430;--muted:#667085;--line:#e3e7ee;--accent:#2b6cb0;--accent-ink:#fff;
+--warn-bg:#fff4d6;--warn-ink:#7a4b00;--warn-line:#f0c36d;--edit:#2b6cb0;--solved:#6b46c1;--out:#b42318;--ok:#067647;
+--chart1:#2b6cb0;--chart2:#c2410c;--chart3:#0f766e;--shadow:0 1px 2px rgba(16,24,40,.06)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f141b;--panel:#171e28;--ink:#e6eaf0;--muted:#9aa5b5;--line:#2a3442;
+--accent:#6aa9f0;--accent-ink:#0b1220;--warn-bg:#3a2d0c;--warn-ink:#ffd47a;--warn-line:#7a5a14;--edit:#6aa9f0;--solved:#b79cf5;--out:#ff8a80;--ok:#5fd39b;
+--chart1:#6aa9f0;--chart2:#f59e5b;--chart3:#4fd1c5;--shadow:none}}
+:root[data-theme=dark]{--bg:#0f141b;--panel:#171e28;--ink:#e6eaf0;--muted:#9aa5b5;--line:#2a3442;--accent:#6aa9f0;--accent-ink:#0b1220;
+--warn-bg:#3a2d0c;--warn-ink:#ffd47a;--warn-line:#7a5a14;--edit:#6aa9f0;--solved:#b79cf5;--out:#ff8a80;--ok:#5fd39b;--chart1:#6aa9f0;--chart2:#f59e5b;--chart3:#4fd1c5;--shadow:none}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;align-items:center;gap:16px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+header h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.2px}
+header .sub{color:var(--muted);font-size:12px}
+#banner{display:none;margin:12px 16px 0;padding:10px 14px;border:1px solid var(--warn-line);background:var(--warn-bg);color:var(--warn-ink);border-radius:8px;font-weight:550}
+#error{display:none;margin:12px 16px 0;padding:10px 14px;border:1px solid var(--out);color:var(--out);border-radius:8px}
+.layout{display:grid;grid-template-columns:290px 1fr;gap:16px;padding:16px;align-items:start}
+.layout>*{min-width:0}
+@media (max-width:860px){.layout{grid-template-columns:minmax(0,1fr)}}
+aside,.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;box-shadow:var(--shadow)}
+aside h2,.panel h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:14px 0 8px}
+aside h2:first-child{margin-top:0}
+label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
+input,select,button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+input[type=number]{width:100%}select{width:100%}
+input[type=range]{width:100%;padding:0}
+button{cursor:pointer}button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.link{border:0;background:none;color:var(--accent);padding:0 4px}
+.seg{display:flex}.seg button{flex:1;border-radius:0}.seg button:first-child{border-radius:6px 0 0 6px}.seg button:last-child{border-radius:0 6px 6px 0}
+.seg button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:12px;flex-wrap:wrap}
+.tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:none;padding:8px 12px;color:var(--muted)}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+table{width:100%;border-collapse:collapse}
+th{font-size:12px;text-align:left;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
+td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+tr.changed td{background:color-mix(in srgb,var(--accent) 7%,transparent)}
+td input{width:110px;text-align:right}
+.chip{display:inline-block;font-size:11px;padding:1px 6px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin:1px 2px 1px 0}
+.chip.warn{background:var(--warn-bg);color:var(--warn-ink);border-color:var(--warn-line);font-weight:600}
+.chip.edit{color:var(--edit);border-color:var(--edit)}.chip.solved{color:var(--solved);border-color:var(--solved)}
+.chip.out{color:var(--out);border-color:var(--out)}
+.muted{color:var(--muted)}.small{font-size:12px}
+.scroll{max-height:68vh;overflow:auto;max-width:100%;border:1px solid var(--line);border-radius:8px}
+.card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:8px 0}
+.card.hyp{border-color:var(--warn-line)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media (max-width:700px){.grid2{grid-template-columns:1fr}}
+.kv{display:flex;gap:18px;flex-wrap:wrap;margin:8px 0}.kv div b{display:block;font-size:18px}
+svg text{fill:var(--muted);font-size:11px}svg .axis{stroke:var(--line)}svg .grid{stroke:var(--line);stroke-dasharray:2 3}
+details summary{cursor:pointer;color:var(--muted)}
+.note{color:var(--muted);font-size:12px;margin-top:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>HumanSim</h1><span class="sub">average adult or child, male or female. Reference data with sources; edits ripple through the body.</span>
+  <span style="flex:1"></span><button id="theme" class="link" title="Toggle light/dark">Theme</button>
+</header>
+<div id="banner" role="status"></div>
+<div id="error" role="alert"></div>
+<div class="layout">
+<aside>
+  <h2>Person</h2>
+  <div class="seg" id="sex"><button data-v="male" class="on">Male</button><button data-v="female">Female</button></div>
+  <label for="age">Age: <b id="ageLabel">adult</b></label>
+  <input type="range" id="age" min="0" max="20" step="1" value="20">
+  <div class="small muted">20 = adult. Below 20: CDC growth curves and ICRP anchor ages.</div>
+  <div id="zBox" style="display:none"><label for="z">Growth percentile z-score: <b id="zLabel">0</b></label>
+  <input type="range" id="z" min="-2" max="2" step="0.1" value="0"></div>
+  <h2>Calculation</h2>
+  <label class="row" style="color:var(--ink);font-size:13px"><input type="checkbox" id="solve" checked style="flex:0 0 auto;width:auto"> Let edits ripple (solver)</label>
+  <div class="small muted">Off: show only the values you changed.</div>
+  <h2>Your changes</h2>
+  <div id="summary" class="small muted">None yet.</div>
+  <div style="margin-top:8px"><button id="resetAll">Reset everything</button></div>
+</aside>
+<main class="panel">
+  <div class="tabs" id="tabs">
+    <button data-t="body" class="on">Body</button><button data-t="compare">Male vs female</button>
+    <button data-t="hormones">Hormones</button><button data-t="drugs">Drugs</button><button data-t="edits">Gene edits</button>
+  </div>
+  <div id="view"></div>
+</main>
+</div>
+<script>
+"use strict";
+const $ = (s, el=document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const S = {sex:"male", age:"adult", z:0, edits:{}, hormones:{}, genotype:{}, gene_edits:[], solve:true, cycle_day:"", cycle_phase:"", tab:"body",
+           filter:"", group:"", onlyChanged:false};
+let META = null, LAST = null, timer = null, seq = 0;
+const PK = {drug:null, dose_mg:1000, infusion_h:0.25, repeats:1, every_h:8, hours:24};
+const HPG = {added_testosterone:600, dose_days:60, days:180};
+
+async function api(path, body) {
+  const r = await fetch(path, body ? {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)} : {});
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+function showError(msg) { const e = $("#error"); e.textContent = msg || ""; e.style.display = msg ? "block" : "none"; }
+function payload() {
+  return {sex:S.sex, age:S.age, z:S.z, edits:S.edits, hormones:S.hormones, genotype:S.genotype, gene_edits:S.gene_edits,
+          solve:S.solve, cycle_day:S.sex==="female" ? S.cycle_day : "", cycle_phase:S.cycle_phase || null};
+}
+function fmt(v) {
+  if (v === null || v === undefined) return "";
+  const a = Math.abs(v);
+  if (a !== 0 && (a >= 1e5 || a < 1e-3)) return v.toExponential(3);
+  return Number(v.toPrecision(5)).toString();
+}
+function chips(flags) {
+  const warn = new Set(["hypothetical","downstream_of_hypothetical","germline","mosaic_assumed_linear","age_effect_unmodelled","unsourced","placeholder"]);
+  return (flags||[]).filter(f => !["derived","modified","referenced"].includes(f)).map(f => {
+    const c = warn.has(f) && f.includes("hypothetical") || f==="germline" ? "warn" : f==="edited"||f==="hormone_set" ? "edit" : f==="solved" ? "solved"
+            : f.startsWith("outside")||f.startsWith("beyond") ? "out" : "";
+    return `<span class="chip ${c}" title="${esc(f)}">${esc(f.replaceAll("_"," "))}</span>`;
+  }).join("");
+}
+
+/* ---------- charts ---------- */
+function lineChart(el, series, o={}) {
+  const W=640,H=o.h||240,m={l:52,r:12,t:12,b:34};
+  const xs=series.flatMap(s=>s.x), ys=series.flatMap(s=>s.y.filter(v=>v!=null));
+  if(!xs.length){el.innerHTML="";return;}
+  const x0=Math.min(...xs),x1=Math.max(...xs); let y0=o.y0!=null?o.y0:Math.min(0,...ys),y1=Math.max(...ys); if(y1<=y0)y1=y0+1; y1*=1.05;
+  const X=v=>m.l+(v-x0)/((x1-x0)||1)*(W-m.l-m.r), Y=v=>H-m.b-(v-y0)/(y1-y0)*(H-m.t-m.b);
+  let g="";
+  for(let i=0;i<=4;i++){const v=y0+(y1-y0)*i/4,y=Y(v);g+=`<line class="grid" x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}"/><text x="${m.l-6}" y="${y+4}" text-anchor="end">${esc(fmt(+v.toPrecision(3)))}</text>`;}
+  for(let i=0;i<=5;i++){const v=x0+(x1-x0)*i/5;g+=`<text x="${X(v)}" y="${H-m.b+16}" text-anchor="middle">${esc(fmt(+v.toPrecision(3)))}</text>`;}
+  g+=`<line class="axis" x1="${m.l}" x2="${m.l}" y1="${m.t}" y2="${H-m.b}"/><line class="axis" x1="${m.l}" x2="${W-m.r}" y1="${H-m.b}" y2="${H-m.b}"/>`;
+  if(o.marker!=null) g+=`<line x1="${X(o.marker)}" x2="${X(o.marker)}" y1="${m.t}" y2="${H-m.b}" stroke="var(--chart2)" stroke-dasharray="4 3"/>`;
+  const cols=["var(--chart1)","var(--chart2)","var(--chart3)"];
+  series.forEach((s,i)=>{const pts=s.x.map((x,j)=>s.y[j]==null?null:`${X(x).toFixed(1)},${Y(s.y[j]).toFixed(1)}`).filter(Boolean).join(" ");
+    g+=`<polyline fill="none" stroke="${cols[i%3]}" stroke-width="2" points="${pts}"/>`;});
+  const leg=series.length>1?series.map((s,i)=>`<span style="color:${cols[i%3]}">&#9632;</span> ${esc(s.name)}`).join("&nbsp;&nbsp; "):"";
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(o.title||"chart")}">${g}<text x="${W/2}" y="${H-2}" text-anchor="middle">${esc(o.xlabel||"")}</text></svg><div class="small muted">${leg}</div>`;
+}
+
+/* ---------- refresh ---------- */
+function schedule() { clearTimeout(timer); timer = setTimeout(refresh, 120); }
+async function refresh() {
+  const my = ++seq;
+  try {
+    const r = await api("/api/resolve", payload());
+    if (my !== seq) return;
+    LAST = r; showError("");
+  } catch (e) { if (my === seq) { showError(e.message); } }
+  renderBanner(); renderSummary(); renderView();
+}
+function renderBanner() {
+  const b = $("#banner"), parts = [];
+  if (LAST && LAST.hypothetical) parts.push("HYPOTHETICAL: this state includes gene-edit effects that are not data. It is an exploration, not a prediction.");
+  if (LAST && LAST.germline) parts.push("Germline editing is heritable and prohibited or restricted for human embryos in many countries.");
+  b.style.display = parts.length ? "block" : "none"; b.innerHTML = parts.map(esc).join("<br>");
+}
+function renderSummary() {
+  const bits = [];
+  for (const [k,v] of Object.entries(S.edits)) bits.push(`${esc(name(k))} = ${esc(fmt(v))}`);
+  for (const [k,v] of Object.entries(S.hormones)) bits.push(`${esc(name(k))} set to ${esc(fmt(v))}`);
+  for (const [k,v] of Object.entries(S.genotype)) bits.push(`${esc(k)} ${esc(v)}`);
+  S.gene_edits.forEach(g => bits.push(`${esc(g.gene)} edit (${esc(g.mode)})`));
+  if (S.cycle_day) bits.push(`cycle day ${esc(S.cycle_day)}`);
+  $("#summary").innerHTML = bits.length ? bits.join("<br>") : "None yet.";
+}
+const name = id => (META.parameters.find(p => p.id === id) || {name:id}).name;
+const pinfo = id => META.parameters.find(p => p.id === id);
+
+/* ---------- views ---------- */
+function renderView() {
+  if (!META) return;
+  ({body:viewBody, compare:viewCompare, hormones:viewHormones, drugs:viewDrugs, edits:viewEdits})[S.tab]();
+}
+function viewBody() {
+  if (!LAST) { $("#view").innerHTML = '<p class="muted">Loading…</p>'; return; }
+  const rows = META.parameters.filter(p => LAST.values[p.id] && (!S.group || p.group === S.group)
+    && (!S.filter || (p.name + p.id).toLowerCase().includes(S.filter.toLowerCase())));
+  const body = rows.map(p => {
+    const r = LAST.values[p.id], v = r.value, b = r.baseline;
+    const changed = v !== null && b !== null && Math.abs(v-b) > 1e-9*Math.max(1,Math.abs(b));
+    if (S.onlyChanged && !changed) return "";
+    const pct = changed && b !== 0 ? ((v-b)/Math.abs(b)*100) : null;
+    const editable = p.kind !== "derived";
+    const cell = editable ? `<input type="number" step="any" data-id="${esc(p.id)}" value="${v===null?"":esc(String(+v.toPrecision(6)))}" placeholder="no data" aria-label="${esc(p.name)}">`
+                          : `<span>${esc(fmt(v))}</span>`;
+    return `<tr class="${changed?"changed":""}"><td>${esc(p.name)}<div class="small muted">${esc(p.group)} · ${esc(p.id)}</div></td>
+      <td class="num">${cell}${S.edits[p.id]!==undefined?` <button class="link" data-reset="${esc(p.id)}" title="Undo this edit">&#8634;</button>`:""}</td>
+      <td class="muted">${esc(p.unit)}</td><td class="num muted">${esc(fmt(b))}</td>
+      <td class="num">${pct===null?"":(pct>0?"+":"")+pct.toFixed(1)+"%"}</td><td>${chips(r.flags)}</td></tr>`;
+  }).join("");
+  const solver = LAST.solver ? `<div class="note">Solver ${LAST.solver.converged?"converged":"<b>DID NOT CONVERGE</b>"} in ${LAST.solver.iterations} iteration(s); ${LAST.solver.skipped} couplings skipped.</div>` : "";
+  const trace = LAST.trace.filter(t => t.stage !== "sex");
+  $("#view").innerHTML = `<div class="row" style="margin-bottom:8px">
+    <input id="q" placeholder="Search parameters" value="${esc(S.filter)}" style="flex:2">
+    <select id="grp"><option value="">All groups</option>${META.groups.map(g=>`<option ${g===S.group?"selected":""}>${esc(g)}</option>`).join("")}</select>
+    <label class="row" style="margin:0;color:var(--ink);font-size:13px"><input type="checkbox" id="chg" ${S.onlyChanged?"checked":""} style="flex:0 0 auto;width:auto"> Only changed</label></div>
+    <div class="scroll"><table><thead><tr><th>Parameter</th><th>Value (edit me)</th><th>Unit</th><th>Baseline</th><th>Change</th><th>Flags</th></tr></thead><tbody>${body||'<tr><td colspan="6" class="muted">Nothing to show.</td></tr>'}</tbody></table></div>${solver}
+    ${trace.length?`<details><summary>What changed and why (${trace.length})</summary><table><tbody>${trace.map(t=>`<tr><td>${esc(t.stage)}</td><td>${esc(name(t.param))}</td><td class="num">${esc(fmt(t.before))} → ${esc(fmt(t.after))}</td><td class="small muted">${esc(t.note)}</td></tr>`).join("")}</tbody></table></details>`:""}`;
+  $("#q").oninput = e => { S.filter = e.target.value; viewBody(); const q=$("#q"); q.focus(); q.setSelectionRange(q.value.length,q.value.length); };
+  $("#grp").onchange = e => { S.group = e.target.value; viewBody(); };
+  $("#chg").onchange = e => { S.onlyChanged = e.target.checked; viewBody(); };
+  document.querySelectorAll("td input[data-id]").forEach(i => i.onchange = () => {
+    const v = i.value.trim(); if (v === "") delete S.edits[i.dataset.id]; else S.edits[i.dataset.id] = Number(v); schedule(); });
+  document.querySelectorAll("[data-reset]").forEach(b => b.onclick = () => { delete S.edits[b.dataset.reset]; schedule(); });
+}
+async function viewCompare() {
+  $("#view").innerHTML = '<p class="muted">Loading…</p>';
+  try {
+    const c = await api("/api/compare", {...payload(), sex:undefined});
+    const rows = META.parameters.filter(p => c.male.values[p.id] || c.female.values[p.id]).map(p => {
+      const m = c.male.values[p.id]?.value ?? null, f = c.female.values[p.id]?.value ?? null;
+      const ratio = m && f ? f/m : null;
+      return `<tr><td>${esc(p.name)}<div class="small muted">${esc(p.group)}</div></td><td class="num">${esc(fmt(m))}</td><td class="num">${esc(fmt(f))}</td><td class="muted">${esc(p.unit)}</td><td class="num">${ratio===null?"":ratio.toFixed(3)}</td></tr>`;
+    }).join("");
+    if (S.tab !== "compare") return;
+    $("#view").innerHTML = `<p class="small muted">Both sexes with your current age, edits and gene edits. Female cycle day applies to the female column.</p><div class="scroll"><table><thead><tr><th>Parameter</th><th>Male</th><th>Female</th><th>Unit</th><th>F / M</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  } catch (e) { showError(e.message); }
+}
+async function viewHormones() {
+  const cyc = await api("/api/cycle");
+  const women = S.sex === "female";
+  let h = "";
+  if (women) {
+    h += `<h2>Menstrual cycle</h2><label for="cd">Cycle day: <b>${S.cycle_day || "none"}</b></label>
+      <input type="range" id="cd" min="0" max="28" step="1" value="${S.cycle_day || 0}"><div class="small muted">0 = no cycle profile (follicular reference values). The profile joins phase midpoints with straight lines, so it misses the sharp midcycle LH peak.</div>
+      <div class="grid2" id="cycCharts"></div>`;
+  } else {
+    h += `<h2>Testosterone</h2><div class="grid2"><div><label for="tt">Set total testosterone (ng/dL)</label>
+      <input type="number" id="tt" step="any" value="${S.hormones.testosterone_total ?? ""}" placeholder="reference"><div class="small muted">Raises muscle mass by about 2.95 kg per natural-log unit (Bhasin 2001; valid 542–2370 ng/dL), then ripples through the body.</div></div>
+      <div><button id="ttClear">Clear</button></div></div>
+      <h2>Feedback simulation (assumed model)</h2>
+      <div class="grid2"><div><label>Added testosterone while dosing (ng/dL)</label><input type="number" id="hAdd" value="${HPG.added_testosterone}"></div>
+      <div><label>Dosing days</label><input type="number" id="hDays" value="${HPG.dose_days}"></div>
+      <div><label>Total days</label><input type="number" id="hTot" value="${HPG.days}"></div><div style="align-self:end"><button class="primary" id="hRun">Run</button></div></div>
+      <div id="hpgOut"></div>`;
+  }
+  h += `<h2>Reference values</h2><div class="scroll"><table><thead><tr><th>Hormone</th><th>Value</th><th>Unit</th><th>Flags</th></tr></thead><tbody>${META.hormones.filter(id=>LAST&&LAST.values[id]).map(id=>{const r=LAST.values[id];return `<tr><td>${esc(name(id))}</td><td class="num">${esc(fmt(r.value))}</td><td class="muted">${esc(pinfo(id).unit)}</td><td>${chips(r.flags)}</td></tr>`}).join("")}</tbody></table></div>
+    <div class="note">Values are midpoints of published single-lab reference intervals, not population means.</div>`;
+  if (S.tab !== "hormones") return;
+  $("#view").innerHTML = h;
+  if (women) {
+    const el = $("#cycCharts");
+    ["lh","fsh","estradiol","progesterone"].forEach(k => { const d = document.createElement("div"); d.innerHTML = `<b>${esc(name(k))}</b> <span class="muted small">${esc(cyc.units[k])}</span><div></div>`; el.appendChild(d);
+      lineChart(d.lastChild, [{name:k, x:cyc.days, y:cyc.series[k]}], {h:170, marker:S.cycle_day||null, xlabel:"cycle day", title:name(k), y0:0}); });
+    $("#cd").oninput = e => { S.cycle_day = +e.target.value || ""; schedule(); };
+  } else {
+    $("#tt").onchange = e => { const v=e.target.value.trim(); if(v==="") delete S.hormones.testosterone_total; else S.hormones.testosterone_total=Number(v); schedule(); };
+    $("#ttClear").onclick = () => { delete S.hormones.testosterone_total; schedule(); };
+    $("#hRun").onclick = async () => {
+      HPG.added_testosterone=+$("#hAdd").value; HPG.dose_days=+$("#hDays").value; HPG.days=+$("#hTot").value;
+      try { const r = await api("/api/hpg", HPG); showError("");
+        $("#hpgOut").innerHTML = `<div class="grid2"><div><b>Testosterone</b> <span class="muted small">ng/dL</span><div id="c1"></div></div><div><b>LH</b> <span class="muted small">mIU/mL</span><div id="c2"></div></div></div>
+          <div class="note">ASSUMED model: structure, feedback strength and time constants are assumptions, not fitted to data. Dosing is modelled as a steady input that raises testosterone by the amount above while it lasts.</div>`;
+        lineChart($("#c1"), [{name:"testosterone", x:r.t, y:r.T}], {h:200, xlabel:"days", title:"testosterone", y0:0});
+        lineChart($("#c2"), [{name:"LH", x:r.t, y:r.LH}], {h:200, xlabel:"days", title:"LH", y0:0});
+      } catch (e) { showError(e.message); } };
+  }
+}
+async function viewDrugs() {
+  if (!PK.drug) PK.drug = META.drugs[0].id;
+  const d = META.drugs.find(x => x.id === PK.drug);
+  const gsel = d.genes.map(gid => { const g = META.genes.find(x => x.id === gid); if (!g) return "";
+    const dips = Object.keys(g.frequencies).sort((a,b)=>g.frequencies[b]-g.frequencies[a]);
+    return `<label>${esc(g.id)} genotype</label><select data-gene="${esc(g.id)}"><option value="">reference (*1/*1)</option>${dips.filter(x=>x!=="*1/*1").map(x=>`<option ${S.genotype[g.id]===x?"selected":""} value="${esc(x)}">${esc(x)} (${(g.frequencies[x]*100).toFixed(1)}% of Europeans)</option>`).join("")}</select>`; }).join("");
+  $("#view").innerHTML = `<div class="grid2"><div><label>Drug (intravenous)</label><select id="drug">${META.drugs.map(x=>`<option value="${esc(x.id)}" ${x.id===PK.drug?"selected":""}>${esc(x.name)}</option>`).join("")}</select>
+    <div class="row"><div><label>Dose (mg)</label><input type="number" id="dose" value="${PK.dose_mg}"></div><div><label>Infusion (h)</label><input type="number" step="any" id="inf" value="${PK.infusion_h}"></div></div>
+    <div class="row"><div><label>Number of doses</label><input type="number" id="rep" value="${PK.repeats}"></div><div><label>Every (h)</label><input type="number" id="every" value="${PK.every_h}"></div></div>
+    <label>Show hours</label><input type="number" id="hrs" value="${PK.hours}">${gsel}
+    <div style="margin-top:10px"><button class="primary" id="pkRun">Simulate</button></div></div><div id="pkOut"><p class="muted">Uses the person, edits and gene edits on the left.</p></div></div>
+    <div class="note">One-compartment model; clearance and volume scale with this person's liver mass, hepatic flow and body mass (assumed exponents). It understates early peaks.</div>`;
+  $("#drug").onchange = e => { PK.drug = e.target.value; S.genotype = {}; viewDrugs(); };
+  document.querySelectorAll("[data-gene]").forEach(s => s.onchange = () => { if (s.value) S.genotype[s.dataset.gene] = s.value; else delete S.genotype[s.dataset.gene]; schedule(); });
+  const run = async () => {
+    PK.dose_mg=+$("#dose").value; PK.infusion_h=+$("#inf").value; PK.repeats=+$("#rep").value; PK.every_h=+$("#every").value; PK.hours=+$("#hrs").value;
+    try { const r = await api("/api/pk", {...payload(), solve:true, ...PK}); showError("");
+      $("#pkOut").innerHTML = `${r.hypothetical?'<div class="card hyp"><b>HYPOTHETICAL inputs:</b> the body this was scaled from includes gene-edit effects that are not data.</div>':""}
+        <b>${esc(r.drug)}</b><div id="pkChart"></div><div class="kv"><div><b>${r.cmax_mg_l.toFixed(2)}</b>peak mg/L</div><div><b>${r.half_life_h.toFixed(2)}</b>half-life h</div><div><b>${r.clearance_l_h.toFixed(1)}</b>clearance L/h</div><div><b>${r.volume_l.toFixed(1)}</b>volume L</div><div><b>${r.auc.toFixed(1)}</b>AUC mg·h/L</div></div>
+        <div>${r.flags.map(f=>`<span class="chip ${f.includes("hypo")?"warn":""}">${esc(f.replaceAll("_"," "))}</span>`).join("")}</div>
+        ${r.notes.map(n=>`<div class="note">${esc(n)}</div>`).join("")}`;
+      lineChart($("#pkChart"), [{name:"plasma concentration", x:r.t, y:r.c}], {h:230, xlabel:"hours", title:"plasma concentration", y0:0});
+    } catch (e) { showError(e.message); } };
+  $("#pkRun").onclick = run;
+}
+function viewEdits() {
+  const cat = META.catalogue.map(l => `<div class="card hyp"><b>${esc(l.id)}</b> <span class="muted">${esc(l.name)}</span>${l.states.map(s=>`
+    <div style="margin-top:6px"><i>${esc(s.state.replaceAll("_"," "))}</i><div class="small muted">${esc(s.description)}</div>
+    ${s.effects.map(e=>`<div class="small"><span class="chip ${e.tier==="measured"?"":"warn"}">${esc(e.tier)}</span> ${esc(name(e.param))} ${esc(e.op)} ${esc(e.value)} <span class="muted">— ${esc(e.rationale)}</span></div>`).join("")}
+    <button data-add="${esc(l.id)}|${esc(s.state)}|${esc(l.gene)}" style="margin-top:4px">Apply this edit</button></div>`).join("")}</div>`).join("");
+  const active = S.gene_edits.map((g,i) => `<div class="card ${"hyp"}"><b>${esc(g.gene)}</b> ${g.locus?esc(g.locus+" / "+g.state):"your hypothesis: "+esc(g.hypothesis.map(h=>`${name(h.param)} ${h.op} ${h.value}`).join(", "))}
+    <div class="small muted">${esc(g.mode)}${g.mode==="somatic"?`, ${Math.round(g.fraction*100)}% of cells${g.tissue?", "+esc(g.tissue):""}`:" (every cell, from conception)"}</div><button class="link" data-del="${i}">Remove</button></div>`).join("") || '<p class="muted">No gene edits applied.</p>';
+  $("#view").innerHTML = `<div class="card hyp"><b>Read this first.</b> This is a place to explore ideas, not a predictor. Effects marked <span class="chip warn">hypothetical</span> are stated guesses or your own ideas, not data. Nothing here says what an edit would do to a real person.</div>
+    <div class="grid2"><div><h2>How to apply</h2>
+    <div class="seg" id="mode"><button data-v="somatic" class="${S.editMode!=="germline"?"on":""}">Somatic (in vivo)</button><button data-v="germline" class="${S.editMode==="germline"?"on":""}">Germline</button></div>
+    <div id="fracBox" style="${S.editMode==="germline"?"display:none":""}"><label>Share of cells edited: <b id="fl">${Math.round((S.editFraction??1)*100)}%</b></label><input type="range" id="frac" min="1" max="100" value="${Math.round((S.editFraction??1)*100)}">
+    <label>Tissue (recorded only)</label><input id="tissue" placeholder="e.g. skeletal muscle" value="${esc(S.editTissue||"")}"><div class="small muted">Scaling the effect by this share is an assumption.</div></div>
+    <div class="small muted" id="gl" style="${S.editMode==="germline"?"":"display:none"}">Germline editing is heritable and prohibited or restricted for human embryos in many countries. Effects are applied at any age; developmental effects in children are not modelled.</div>
+    <h2>Active edits</h2>${active}</div>
+    <div><h2>Your own hypothesis</h2><label>Gene symbol</label><input id="hg" placeholder="e.g. FOXP2"><label>Parameter</label>
+    <select id="hp">${META.parameters.filter(p=>p.kind!=="derived").map(p=>`<option value="${esc(p.id)}">${esc(p.name)} (${esc(p.unit)})</option>`).join("")}</select>
+    <div class="row"><div><label>Operation</label><select id="ho"><option value="ratio">multiply by</option><option value="offset">add</option><option value="set">set to</option></select></div><div><label>Value</label><input type="number" step="any" id="hv" value="1.2"></div></div>
+    <div style="margin-top:8px"><button class="primary" id="hadd">Add hypothesis</button></div></div></div>
+    <h2>Catalogue</h2>${cat}`;
+  const common = () => ({mode:S.editMode||"somatic", fraction:S.editMode==="germline"?1:(S.editFraction??1), tissue:S.editTissue||""});
+  document.querySelectorAll("#mode button").forEach(b => b.onclick = () => { S.editMode = b.dataset.v; viewEdits(); });
+  const fr = $("#frac"); if (fr) { fr.oninput = e => { S.editFraction = +e.target.value/100; $("#fl").textContent = e.target.value+"%"; }; $("#tissue").oninput = e => S.editTissue = e.target.value; }
+  document.querySelectorAll("[data-add]").forEach(b => b.onclick = () => { const [locus,state,gene]=b.dataset.add.split("|"); S.gene_edits.push({gene,locus,state,...common()}); schedule(); viewEdits(); });
+  document.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { S.gene_edits.splice(+b.dataset.del,1); schedule(); viewEdits(); });
+  $("#hadd").onclick = () => { const gene=$("#hg").value.trim().toUpperCase(); if(!gene){showError("Give a gene symbol.");return;}
+    S.gene_edits.push({gene, hypothesis:[{param:$("#hp").value, op:$("#ho").value, value:Number($("#hv").value)}], ...common()}); showError(""); schedule(); viewEdits(); };
+}
+
+/* ---------- wiring ---------- */
+function ageLabel() { $("#ageLabel").textContent = S.age === "adult" ? "adult" : S.age + " y"; $("#zBox").style.display = S.age === "adult" ? "none" : "block"; }
+document.querySelectorAll("#sex button").forEach(b => b.onclick = () => { S.sex = b.dataset.v;
+  document.querySelectorAll("#sex button").forEach(x => x.classList.toggle("on", x === b)); schedule(); });
+$("#age").oninput = e => { const v = +e.target.value; S.age = v >= 20 ? "adult" : v; ageLabel(); schedule(); };
+$("#z").oninput = e => { S.z = +e.target.value; $("#zLabel").textContent = S.z; schedule(); };
+$("#solve").onchange = e => { S.solve = e.target.checked; schedule(); };
+$("#resetAll").onclick = () => { Object.assign(S, {edits:{}, hormones:{}, genotype:{}, gene_edits:[], cycle_day:"", z:0}); $("#z").value = 0; $("#zLabel").textContent = 0; schedule(); };
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => { S.tab = b.dataset.t;
+  document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x === b)); showError(""); renderView(); });
+$("#theme").onclick = () => { const r = document.documentElement, dark = getComputedStyle(r).getPropertyValue("--bg").trim() === "#0f141b";
+  r.dataset.theme = dark ? "light" : "dark"; renderView(); };
+(async () => { try { META = await api("/api/meta"); ageLabel(); await refresh(); } catch (e) { showError("Could not load: " + e.message); } })();
+</script>
+</body>
+</html>
