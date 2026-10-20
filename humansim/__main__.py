@@ -33,6 +33,47 @@ def _parse_edits(reg: Registry, items: list[str]) -> dict[str, float]:
     return edits
 
 
+def _parse_gene_edits(args) -> tuple:
+    """--edit LOCUS:STATE (catalogue) and --hypothesis GENE:PARAM=OP:VALUE (your own idea)."""
+    from .editing import Effect, GeneEdit, load_catalogue
+
+    common = dict(mode=getattr(args, "edit_mode", "somatic"), fraction=getattr(args, "edit_fraction", 1.0),
+                  tissue=getattr(args, "edit_tissue", None))
+    out = []
+    try:
+        for item in getattr(args, "edit", None) or []:
+            locus, _, state = item.partition(":")
+            cat = load_catalogue()
+            if locus not in cat or not state:
+                raise SystemExit(f"--edit needs LOCUS:STATE from the catalogue ({', '.join(cat)}), got {item!r}")
+            out.append(GeneEdit(gene=cat[locus].gene, locus=locus, state=state, **common))
+        for item in getattr(args, "hypothesis", None) or []:
+            gene, _, rest = item.partition(":")
+            param, _, spec = rest.partition("=")
+            op, _, val = spec.partition(":")
+            if not (gene and param and op and val):
+                raise SystemExit(f"--hypothesis needs GENE:PARAM=OP:VALUE (e.g. MSTN:skeletal_muscle_mass=ratio:1.2), got {item!r}")
+            eff = Effect(param=param, op=op, value=float(val), tier="hypothetical",
+                         rationale="supplied by the user as a hypothesis; not data")
+            out.append(GeneEdit(gene=gene, hypothesis=(eff,), **common))
+    except (ValueError, KeyError) as exc:
+        raise SystemExit(f"error: {exc.args[0] if exc.args else exc}") from None
+    return tuple(out)
+
+
+def _catalogue_check(reg: Registry, sources: dict):
+    from .checks import CheckResult
+    from .editing import catalogue_checks, load_catalogue
+
+    cat = load_catalogue()
+    problems = catalogue_checks(reg, cat, sources)
+    n_meas = sum(e.tier == "measured" for loc in cat.values() for _, effs in loc.states.values() for e in effs)
+    n_hyp = sum(e.tier == "hypothetical" for loc in cat.values() for _, effs in loc.states.values() for e in effs)
+    return [CheckResult("gene_catalogue", "fail" if problems else "pass",
+                        "; ".join(problems) if problems else
+                        f"{len(cat)} loci: {n_meas} measured, {n_hyp} hypothetical effects; all parameters and sources exist.")]
+
+
 def _context(args, reg: Registry) -> Context:
     age: object = args.age
     try:
@@ -56,7 +97,8 @@ def _context(args, reg: Registry) -> Context:
         validate_genotype(load_genes(), genotype)
     except (KeyError, ValueError) as exc:
         raise SystemExit(f"error: {exc.args[0] if exc.args else exc}") from None
-    kwargs = dict(sex=args.sex, genotype=genotype, age=age, growth_z=getattr(args, "z", 0.0), edits=_parse_edits(reg, args.set),
+    gene_edits = _parse_gene_edits(args)
+    kwargs = dict(sex=args.sex, genotype=genotype, gene_edits=gene_edits, age=age, growth_z=getattr(args, "z", 0.0), edits=_parse_edits(reg, args.set),
                   keep_unadjusted=getattr(args, "keep_unadjusted", False), hormone_state=hormones,
                   cycle_phase=getattr(args, "cycle_phase", None))
     day = getattr(args, "cycle_day", None)
@@ -93,6 +135,13 @@ def main(argv: list[str] | None = None) -> int:
                        help="set a hormone level, e.g. testosterone_total=1345 (ng/dL); drives hormone effects")
         p.add_argument("--genotype", action="append", metavar="GENE=DIPLOTYPE",
                        help="e.g. CYP2C9='*1/*3'; changes drug clearance where the drug has data")
+        p.add_argument("--edit", action="append", metavar="LOCUS:STATE",
+                       help="apply a catalogue gene edit, e.g. MSTN:loss_of_function (see 'catalogue')")
+        p.add_argument("--hypothesis", action="append", metavar="GENE:PARAM=OP:VALUE",
+                       help="your own hypothetical edit, e.g. MSTN:skeletal_muscle_mass=ratio:1.2 (always flagged hypothetical)")
+        p.add_argument("--edit-mode", default="somatic", choices=["somatic", "germline"])
+        p.add_argument("--edit-fraction", type=float, default=1.0, help="somatic: share of cells edited (0-1]")
+        p.add_argument("--edit-tissue", help="somatic: tissue edited (recorded only)")
         p.add_argument("--cycle-phase", choices=["follicular", "midcycle", "luteal", "postmenopausal"],
                        help="adult women: use this phase's reference hormone values")
         p.add_argument("--cycle-day", type=float, help="adult women: cycle day 1-28 (interpolated profile)")
@@ -124,6 +173,8 @@ def main(argv: list[str] | None = None) -> int:
     p_genes = sub.add_parser("genes", help="pharmacogenes, activity scores and population frequencies")
     p_genes.add_argument("--population", default="european")
 
+    sub.add_parser("catalogue", help="gene-edit catalogue with the tier of every effect")
+
     sub.add_parser("compare", help="male and female side by side")
     sub.add_parser("validate", help="sex rules vs stored pairs, and ANSUR II ratios vs an independent dataset")
 
@@ -135,6 +186,19 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     modifiers = load_modifiers()
+    if args.cmd == "catalogue":
+        from .editing import load_catalogue, load_gene_index
+        print("Every effect is labelled. HYPOTHETICAL means a stated guess, not data.\n")
+        for loc in load_catalogue().values():
+            print(f"{loc.id}: {loc.name}")
+            for sname, (desc, effects) in loc.states.items():
+                print(f"  state {sname}: {desc}")
+                for e in effects:
+                    tag = "MEASURED" if e.tier == "measured" else "HYPOTHETICAL"
+                    print(f"    [{tag}] {e.param} {e.op} {e.value:g}")
+        n = len(load_gene_index())
+        print(f"\nGene index: {n} symbols" + ("" if n else " (none imported; see tools/import_hgnc.py). Any symbol is accepted for --hypothesis."))
+        return 0
     if args.cmd == "genes":
         for g in load_genes().values():
             print(f"{g.id}: {g.name} (activity scores from {g.activity_source_ref})")
@@ -185,6 +249,11 @@ def main(argv: list[str] | None = None) -> int:
                            hide_missing=not args.all))
         for note in state.notes:
             print(f"\nNote: {note}")
+        if any("hypothetical" in f or "downstream_of_hypothetical" in f for f in state.flags.values()):
+            print("\n*** HYPOTHETICAL: this state includes gene-edit effects that are NOT data (flagged hypothetical / "
+                  "downstream_of_hypothetical). It is an exploration, not a prediction. ***")
+        if any("germline" in f for f in state.flags.values()):
+            print("Germline editing is heritable and prohibited or restricted for human embryos in many countries.")
         if state.solver:
             sv = state.solver
             print(f"\nSolver: {'converged' if sv['converged'] else 'DID NOT CONVERGE'} in {sv['iterations']} "
@@ -210,7 +279,8 @@ def main(argv: list[str] | None = None) -> int:
                + modifier_checks(reg, modifiers, sources)
                + coupling_checks(reg, couplings, sources)
                + growth_continuity(reg, state.context.sex)
-               + drug_checks(reg, load_drugs(), sources, modifiers))
+               + drug_checks(reg, load_drugs(), sources, modifiers)
+               + _catalogue_check(reg, sources))
     return _print_checks(results)
 
 

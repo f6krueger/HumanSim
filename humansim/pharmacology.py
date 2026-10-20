@@ -192,6 +192,10 @@ def simulate(registry: Registry, state: State, drug: Drug, doses: list[Dose], ho
     res.flags = {"assumed_scaling", "one_compartment"} | ({"unsourced"} if drug.status != "referenced" else set())
     if any(f in state.flags.get(p, set()) for p in drug.clearance_scaling for f in ("edited", "modified", "solved")):
         res.flags.add("scaled_from_changed_body")
+    drivers = set(drug.clearance_scaling) | set(drug.volume_scaling)
+    if any({"hypothetical", "downstream_of_hypothetical"} & state.flags.get(p, set()) for p in drivers):
+        res.flags.add("hypothetical_inputs")
+        res.notes.append("HYPOTHETICAL: the body this was scaled from includes gene-edit effects that are not data.")
     res.notes.append(drug.scaling_note)
     _, gnotes, gflags = genotype_clearance_factor(drug, state.context.genotype)
     res.notes.extend(gnotes)

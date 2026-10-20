@@ -79,6 +79,7 @@ def solve(registry: Registry, context: Context, modifiers: Iterable[Modifier],
             break
 
     flags = {k: set(v) for k, v in state.flags.items()}
+    hypothetical = any("hypothetical" in f for f in flags.values())  # an unsourced edit is driving this solve
     trace = list(state.trace)
     for c in couplings:
         if c.id not in last:
@@ -88,6 +89,8 @@ def solve(registry: Registry, context: Context, modifiers: Iterable[Modifier],
         if before is None or math.isclose(before, after, rel_tol=1e-9):
             continue
         flags[c.target].add("solved")
+        if hypothetical:
+            flags[c.target].add("downstream_of_hypothetical")
         if c.status != "referenced":
             flags[c.target].add(f"coupling_{c.status}")
         note = f"{c.kind} {c.role}; driving ratio {raw:.3g}, applied {g:.3g}"

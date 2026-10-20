@@ -1,0 +1,35 @@
+# Gene-edit catalogue. Every effect has a tier. Nothing here is a prediction.
+# tier measured: sourced effect size. tier hypothetical: a stated guess, labelled as such everywhere.
+# This starter set is hypothetical only: no sourced human effect size was retrieved for these loci.
+# Magnitudes are round numbers chosen to be of a plausible order, from general (unretrieved) knowledge;
+# replace them with sourced values (tier measured) as evidence is added.
+loci:
+  - id: MSTN
+    gene: MSTN
+    name: Myostatin (negative regulator of muscle growth)
+    states:
+      loss_of_function:
+        description: "Loss of myostatin function. Marked muscle overgrowth is known in several animal species; human evidence is a very small number of cases."
+        effects:
+          - {param: skeletal_muscle_mass, op: ratio, value: 1.2, tier: hypothetical,
+             rationale: "Guess: +20% muscle. The size in humans is unknown; animals show larger effects, but humans differ and the edit would act on adult muscle only in part."}
+  - id: EPOR
+    gene: EPOR
+    name: Erythropoietin receptor
+    states:
+      truncated_gain_of_function:
+        description: "Truncating variants that keep the receptor signalling longer. Known as a cause of familial high red cell mass."
+        effects:
+          - {param: hemoglobin, op: ratio, value: 1.15, tier: hypothetical,
+             rationale: "Guess: +15% haemoglobin, a mild-to-moderate elevation of the kind reported in affected families; no dose-response was retrieved."}
+          - {param: hematocrit, op: ratio, value: 1.15, tier: hypothetical,
+             rationale: "Moves with haemoglobin. Higher haematocrit also raises blood viscosity, which the model does not capture."}
+  - id: GHR
+    gene: GHR
+    name: Growth hormone receptor
+    states:
+      loss_of_function:
+        description: "Loss of growth hormone receptor function (growth hormone insensitivity / Laron syndrome). Adult height is markedly reduced."
+        effects:
+          - {param: height, op: ratio, value: 0.72, tier: hypothetical,
+             rationale: "Guess: about 28% shorter adult height, an order of magnitude consistent with reported severe short stature. Not a retrieved measurement. Only meaningful for adults; the effect arises during growth."}

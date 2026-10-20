@@ -4,7 +4,7 @@ A Python library that models the human body as a network of interconnected anato
 physiological parameters, for population averages (not individuals). You set a context, edit any
 value, and see what changes. See `docs/SPEC.md` for the full design.
 
-**Status: Phase 7.** The core, derived layer, consistency checks, modifier machinery, adult male and
+**Status: Phase 7 plus a gene-edit sandbox.** The core, derived layer, consistency checks, modifier machinery, adult male and
 female baselines (both stored, either derivable from the other), a steady-state solver and an age
 axis for birth to 20 years, sex hormones (levels, one dose-response effect, two dynamic models) exist. A first pharmacokinetics layer and a one-gene pharmacogenetics layer exist. The UI is not built yet. Run `python -m humansim coverage` to see exactly how much data there is.
 
@@ -259,6 +259,44 @@ them. Ibuprofen clearance and volume are *derived* from the label's AUC and rate
 73 kg volunteer. Genotype changes no anatomical or physiological parameter: no sourced numbers for that are
 in the project yet. CYP3A5 was examined for midazolam and left out because the sources found show no effect.
 
+## Gene edits: somatic and germline (sandbox)
+
+```
+python -m humansim catalogue
+python -m humansim show --edit EPOR:truncated_gain_of_function --edit-mode germline --solve --changed
+python -m humansim show --edit MSTN:loss_of_function --edit-fraction 0.5 --edit-tissue "skeletal muscle" --solve --changed
+python -m humansim show --hypothesis FOXP2:heart_mass=ratio:1.3
+python -m humansim pk --drug acetaminophen --dose 1000 --infusion 0.25 --edit MSTN:loss_of_function --solve
+```
+
+**This is a place to explore ideas, not a predictor.** Every edit effect has a tier. *Measured* means a
+sourced effect size with an evidence grade. *Hypothetical* means a stated guess, or your own idea typed
+in with `--hypothesis`; it is flagged `hypothetical` on every value it changes, on derived values built
+from them, and as `downstream_of_hypothetical` on whatever the solver then moves. The CLI prints a
+banner whenever a state contains one. Pharmacology results scaled from such a body carry
+`hypothetical_inputs`.
+
+- **Somatic** (in vivo): `--edit-fraction` is the share of cells edited. The effect is scaled linearly by it,
+  which is an assumption (flag `mosaic_assumed_linear`). Edited tissue is recorded, not modelled.
+- **Germline**: every cell, from conception (fraction 1, flag `germline`). Heritable, and prohibited or
+  restricted for human embryos in many countries. Effects are applied at any age as a ratio on that
+  age's value; developmental consequences in children are **not modelled** (flag `age_effect_unmodelled`).
+- The person is assumed to start with the reference (average) alleles. Effects are applied to the average
+  body, not to an individual's genome or ancestry.
+- **Catalogue.** `data/genetics/catalogue.yaml`: MSTN loss of function (muscle), EPOR truncating gain of
+  function (haemoglobin, haematocrit) and GHR loss of function (height). **All current effects are hypothetical:**
+  the magnitudes are round-number guesses of a plausible order, from general knowledge that was not
+  retrieved as a source in this project. Replace them with sourced values (tier *measured*, with source and
+  evidence) as evidence is added. CYP2C9/ibuprofen (Phase 7) remains the only measured genotype effect.
+- **Full gene list.** `tools/import_hgnc.py` turns an HGNC complete-set download into
+  `data/genetics/gene_index.yaml` (valid symbols, no effects); once present, `--hypothesis` rejects unknown
+  symbols. It was written without network access to genenames.org and tested only on a small sample file in
+  the same layout, so run it on the real download and check the output.
+
+Not modelled: delivery, editing efficiency (you supply the fraction), off-target or unintended edits,
+immune responses, effects on traits that depend on many genes, interactions between edits, and any
+consequence over time.
+
 ## Layout
 
 ```
@@ -277,6 +315,7 @@ humansim/
   cycle.py           menstrual-cycle hormone profile
   pharmacology.py    one-compartment IV pharmacokinetics
   genetics.py        pharmacogene alleles, activity scores, frequencies
+  editing.py         somatic and germline gene edits, measured or hypothetical
   data/genetics/     gene records (genes.yaml)
   data/drugs/        drug records (seed.yaml)
   data/couplings/    the Phase 3 couplings (steady_state.yaml)

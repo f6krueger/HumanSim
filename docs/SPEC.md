@@ -1,4 +1,4 @@
-# Human Reference Simulation: Specification (v0.8 draft)
+# Human Reference Simulation: Specification (v0.9 draft)
 
 Working name: `humansim` (rename any time). Code license: Apache-2.0. Data license: CC BY 4.0 (both easy to change; see section 14).
 
@@ -135,6 +135,7 @@ Each phase ends with something usable.
 5. **Dynamic solver and hormones:** first axis (sex hormones), then others. Built for sex hormones: reference levels (interval midpoints, by cycle phase for women), a log-slope hormone-effect modifier (testosterone to muscle mass, Bhasin 2001), solver carry-through of hormone effects, a generic RK4 ODE engine, an assumed-structure male HPG feedback model, and an interpolated menstrual-cycle profile. No female feedback model, no hormone effects other than testosterone-muscle, no pediatric hormone levels, no ageing of hormones yet.
 6. **Pharmacology:** Built as a scaled one-compartment IV model, not yet PBPK: two seed drugs (acetaminophen, midazolam) from FDA/Pfizer labels, clearance and volume scaled by the person's liver mass, hepatic blood flow and body mass (assumed exponents). No oral absorption, no renal drugs, no drug effects on the body, no variability. Full PBPK on the organ flows and masses already in the registry is the next step.
 7. **Genetics:** Built as pharmacogenetics for one gene: CYP2C9 alleles, CPIC activity scores and phenotypes, Hardy-Weinberg diplotype frequencies (European ancestry only), and a genotype effect on IV ibuprofen clearance from CPIC's meta-analysed AUC ratios. No genotype effect on any anatomical or physiological parameter (no sourced numbers yet), one gene, one population, one drug with data.
+7b. **Gene edits (sandbox):** somatic (fractional, in vivo) and germline edits as genotype-stage modifiers, each effect tiered measured or hypothetical; hypothetical effects are flagged on every value they touch and everything downstream of them in the solver, drugs and derived values. Starter catalogue is hypothetical-only (MSTN, EPOR, GHR); a user can add own hypotheses; an HGNC importer builds a gene-symbol index. Not a predictor; no off-target, delivery, ageing or developmental modelling.
 8. **Web UI.**
 9. **Ongoing:** citation work, new data, new axes.
 

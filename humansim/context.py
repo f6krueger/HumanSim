@@ -21,7 +21,7 @@ from .modifiers import STAGES, Modifier
 from .registry import Registry
 
 # Flags a derived value inherits from its inputs.
-_INHERITED = {"unsourced", "placeholder", "edited", "modified", "interpolated"}
+_INHERITED = {"unsourced", "placeholder", "edited", "modified", "interpolated", "hypothetical", "gene_edit", "downstream_of_hypothetical", "germline"}
 
 
 CYCLE_PHASES = ("follicular", "midcycle", "luteal", "postmenopausal")
@@ -39,6 +39,8 @@ class Context:
     cycle_phase: str | None = None
     genotype: dict[str, str] = field(default_factory=dict)
     drugs: dict[str, float] = field(default_factory=dict)
+    # Gene edits (editing.GeneEdit), somatic or germline, measured or hypothetical.
+    gene_edits: tuple = ()
     # Pediatric ages only: the growth-curve z-score (0 = median, the "average child").
     growth_z: float = 0.0
     edits: dict[str, float] = field(default_factory=dict)  # parameter id -> value in registry unit
@@ -196,6 +198,10 @@ def resolve(registry: Registry, context: Context, modifiers: Iterable[Modifier] 
     trace: list[TraceEntry] = []
 
     applicable = [m for m in modifiers if m.applies(context)]
+    if context.gene_edits:
+        from .editing import edit_modifiers  # local import: editing depends on modifiers
+
+        applicable += edit_modifiers(context.gene_edits)
     applicable.sort(key=lambda m: STAGES.index(m.stage))  # stable within a stage
     if context.sex == "male":
         # Sex rules are written female = f(male). A male value derived from a female-only value
@@ -270,6 +276,16 @@ def resolve(registry: Registry, context: Context, modifiers: Iterable[Modifier] 
             if m.stage == "sex":
                 flags[pid].discard("no_sex_rule")
             flags[pid].add("modified")
+            if m.id.startswith("edit:"):
+                flags[pid].add("gene_edit")
+                if "germline" in m.note:
+                    flags[pid].add("germline")
+                if "mosaic_assumed_linear" in m.note:
+                    flags[pid].add("mosaic_assumed_linear")
+                if context.age != "adult" and not (isinstance(context.age, (int, float)) and context.age >= 20):
+                    flags[pid].add("age_effect_unmodelled")
+            if m.status == "hypothetical":
+                flags[pid].add("hypothetical")
             if m.status != "referenced":
                 flags[pid].add(f"modifier_{m.status}")
             trace.append(TraceEntry(pid, m.stage, m.id, before, after,
